@@ -1,0 +1,1603 @@
+SHGT COMPLETE SOURCE AUDIT
+DATE: 11/09/2026 00:35:55
+
+===== GIT STATUS =====
+## main...origin/main
+ M backend/.env.example
+ M backend/package-lock.json
+ M backend/package.json
+ M backend/src/server.js
+ M frontend/.env.example
+ M frontend/package-lock.json
+ M frontend/package.json
+ M frontend/src/App.jsx
+?? SHGT_AUDIT_REPORT.txt
+?? backend/src/middleware/
+?? backend/src/routes/
+?? frontend/src/components/
+?? frontend/src/features/
+?? frontend/src/hooks/
+?? frontend/src/services/
+
+===== PROJECT FILE TREE =====
+.\backend\package-lock.json
+.\backend\package.json
+.\backend\src\server.js
+.\backend\src\config\database.js
+.\backend\src\middleware\requirePrivyAuth.js
+.\backend\src\routes\auth.routes.js
+.\backend\tests\database.test.js
+.\blockchain\AGENTS.md
+.\blockchain\CLAUDE.md
+.\blockchain\hardhat.config.ts
+.\blockchain\package-lock.json
+.\blockchain\package.json
+.\blockchain\README.md
+.\blockchain\tsconfig.json
+.\blockchain\.agents\skills\hardhat\SKILL.md
+.\blockchain\.agents\skills\hardhat-toolbox-mocha-ethers\SKILL.md
+.\blockchain\.claude\skills\hardhat\SKILL.md
+.\blockchain\.claude\skills\hardhat-toolbox-mocha-ethers\SKILL.md
+.\blockchain\artifacts\artifacts.d.ts
+.\blockchain\artifacts\build-info\solc-0_8_34-6171a5a0fff434b05ea5ec41bbea8b7e17796428.json
+.\blockchain\artifacts\build-info\solc-0_8_34-6171a5a0fff434b05ea5ec41bbea8b7e17796428.output.json
+.\blockchain\artifacts\build-info\solc-0_8_34-8ef00903f0d17c38b6ae8191ee25ab5e4a3d66a8.json
+.\blockchain\artifacts\build-info\solc-0_8_34-8ef00903f0d17c38b6ae8191ee25ab5e4a3d66a8.output.json
+.\blockchain\artifacts\contracts\Counter.sol\artifacts.d.ts
+.\blockchain\artifacts\contracts\Counter.sol\Counter.json
+.\blockchain\artifacts\contracts\Counter.t.sol\CounterTest.json
+.\blockchain\artifacts\contracts\SHGTToken.sol\artifacts.d.ts
+.\blockchain\artifacts\contracts\SHGTToken.sol\SHGTToken.json
+.\blockchain\cache\compile-cache.json
+.\blockchain\ignition\modules\Counter.ts
+.\blockchain\scripts\send-op-tx.ts
+.\blockchain\test\Counter.ts
+.\blockchain\test\SHGTToken.ts
+.\blockchain\types\ethers-contracts\common.ts
+.\blockchain\types\ethers-contracts\Counter.ts
+.\blockchain\types\ethers-contracts\hardhat.d.ts
+.\blockchain\types\ethers-contracts\index.ts
+.\blockchain\types\ethers-contracts\SHGTToken.ts
+.\blockchain\types\ethers-contracts\factories\Counter__factory.ts
+.\blockchain\types\ethers-contracts\factories\index.ts
+.\blockchain\types\ethers-contracts\factories\SHGTToken__factory.ts
+.\frontend\eslint.config.js
+.\frontend\package-lock.json
+.\frontend\package.json
+.\frontend\README.md
+.\frontend\vite.config.js
+.\frontend\src\App.css
+.\frontend\src\App.jsx
+.\frontend\src\index.css
+.\frontend\src\main.jsx
+.\frontend\src\components\EmptyPage.jsx
+.\frontend\src\components\MetricCard.jsx
+.\frontend\src\features\auth\LoginPage.jsx
+.\frontend\src\features\auth\RegistrationForm.css
+.\frontend\src\features\auth\RegistrationForm.jsx
+.\frontend\src\features\dashboard\MemberDashboard.jsx
+.\frontend\src\features\dashboard\components\DashboardHeader.jsx
+.\frontend\src\features\dashboard\components\DashboardSidebar.jsx
+.\frontend\src\hooks\useBackendIdentity.js
+.\frontend\src\hooks\useRegistration.js
+.\frontend\src\services\api.js
+.\frontend\src\services\auth.service.js
+
+===== IMPORTANT SOURCE FILES =====
+
+===== backend/package.json =====
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@privy-io/node": "^0.38.0",
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.9",
+    "express": "^5.3.0",
+    "helmet": "^8.3.0",
+    "morgan": "^1.12.1",
+    "oracledb": "^26.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  },
+  "allowScripts": {
+    "oracledb@26.0.0": true
+  }
+}
+
+===== frontend/package.json =====
+{
+  "name": "frontend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "lint": "eslint .",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@privy-io/react-auth": "^3.51.3",
+    "@solana-program/system": "^0.10.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "eslint": "^10.14.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.7",
+    "globals": "^17.13.0",
+    "vite": "^8.3.6"
+  }
+}
+
+===== frontend/src/App.jsx =====
+import { useState } from "react"
+import { usePrivy, useWallets } from "@privy-io/react-auth"
+
+import LoginPage from "./features/auth/LoginPage"
+import RegistrationForm from "./features/auth/RegistrationForm"
+import MemberDashboard from "./features/dashboard/MemberDashboard"
+
+import { useBackendIdentity } from "./hooks/useBackendIdentity"
+import { useRegistration } from "./hooks/useRegistration"
+
+import "./App.css"
+
+function App() {
+  const {
+    ready,
+    authenticated,
+    user,
+    login,
+    logout,
+    linkPasskey,
+    getAccessToken,
+  } = usePrivy()
+
+  const { wallets } = useWallets()
+
+  const [linking, setLinking] = useState(false)
+  const [message, setMessage] = useState("")
+  const [activeTab, setActiveTab] = useState("Overview")
+
+  const wallet = wallets.find(
+    (item) => item.walletClientType === "privy"
+  )
+
+  const hasPasskey = user?.linkedAccounts?.some(
+    (account) => account.type === "passkey"
+  ) || false
+
+  const {
+    identity,
+    loading: backendLoading,
+    error: backendError,
+    accessDenied,
+    refreshIdentity,
+    retry,
+  } = useBackendIdentity({
+    ready,
+    authenticated,
+    getAccessToken,
+  })
+
+  const {
+    loading: registrationLoading,
+    error: registrationError,
+    submitRegistration,
+  } = useRegistration({
+    getAccessToken,
+    refreshIdentity,
+  })
+
+  const handleLinkPasskey = async () => {
+    setLinking(true)
+    setMessage("")
+
+    try {
+      await linkPasskey()
+      setMessage("Passkey linked successfully!")
+    } catch (error) {
+      console.error("Passkey linking failed:", error)
+      setMessage(error.message || "Passkey linking failed.")
+    } finally {
+      setLinking(false)
+    }
+  }
+
+  const handleRegistration = async (memberData) => {
+    try {
+      console.log("APP RECEIVED REGISTRATION:", memberData)
+      await submitRegistration(memberData)
+    } catch {
+      // The registration hook maintains and exposes the error state.
+    }
+  }
+
+  if (!ready) {
+    return (
+      <main className="loading-screen">
+        <div className="loading-orb" />
+        <p>Preparing your SHGT experience...</p>
+      </main>
+    )
+  }
+
+  if (!authenticated) {
+    return <LoginPage onLogin={login} />
+  }
+
+  if (backendLoading) {
+    return (
+      <main className="loading-screen">
+        <div className="loading-orb" />
+        <p>Verifying your SHGT identity...</p>
+      </main>
+    )
+  }
+
+  if (accessDenied) {
+    return (
+      <main className="loading-screen">
+        <h2>Access restricted</h2>
+        <p>
+          Your authenticated identity does not currently have
+          permission to access this SHGT account.
+        </p>
+        <button className="primary-button" onClick={logout}>
+          Sign out
+        </button>
+      </main>
+    )
+  }
+
+  if (backendError || !identity) {
+    return (
+      <main className="loading-screen">
+        <h2>Unable to verify your identity</h2>
+
+        <p role="alert">
+          {backendError || "No identity information was returned by SHGT."}
+        </p>
+
+        <button className="primary-button" onClick={retry}>
+          Retry verification
+        </button>
+
+        <button className="logout-button" onClick={logout}>
+          Sign out
+        </button>
+      </main>
+    )
+  }
+  console.log("SHGT FRONTEND STATE:", {
+    authenticated,
+    backendLoading,
+    backendError,
+    identity,
+    accessDenied,
+  })
+
+  if (!identity.registered) {
+    return (
+      <RegistrationForm
+        initialEmail={user?.email?.address || ""}
+        loading={registrationLoading}
+        error={registrationError}
+        onSubmit={handleRegistration}
+        onLogout={logout}
+      />
+    )
+  }
+
+  return (
+    <MemberDashboard
+      user={user}
+      wallet={wallet}
+      hasPasskey={hasPasskey}
+      linking={linking}
+      message={message}
+      onLinkPasskey={handleLinkPasskey}
+      onLogout={logout}
+      activeTab={activeTab}
+      setActiveTab={setActiveTab}
+      backendIdentity={identity}
+      backendLoading={backendLoading}
+      backendError={backendError}
+    />
+  )
+}
+
+export default App
+
+===== frontend/src/main.jsx =====
+
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+import { PrivyProvider } from '@privy-io/react-auth'
+import './index.css'
+import App from './App.jsx'
+
+const appId = import.meta.env.VITE_PRIVY_APP_ID
+
+if (!appId) {
+  throw new Error('Missing VITE_PRIVY_APP_ID in frontend/.env')
+}
+
+createRoot(document.getElementById('root')).render(
+  <StrictMode>
+    <PrivyProvider
+      appId={appId}
+      config={{
+        loginMethods: ['email', 'google', 'passkey'],
+        appearance: {
+          theme: 'light',
+          accentColor: '#2563eb',
+          landingHeader: 'Welcome to SHGT',
+        },
+        embeddedWallets: {
+          ethereum: {
+            createOnLogin: 'users-without-wallets',
+          },
+        },
+      }}
+    >
+      <App />
+    </PrivyProvider>
+  </StrictMode>,
+)
+
+===== frontend/src/services/api.js =====
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
+
+if (!API_BASE_URL) {
+  throw new Error("VITE_API_BASE_URL is not configured.")
+}
+
+export async function apiRequest(path, options = {}) {
+  const {
+    token,
+    headers = {},
+    ...requestOptions
+  } = options
+
+  const response = await fetch(
+    `${API_BASE_URL}${path}`,
+    {
+      ...requestOptions,
+      headers: {
+        ...(requestOptions.body ? { "Content-Type": "application/json" } : {}),
+        ...headers,
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    }
+  )
+
+  const data = await response.json().catch(() => ({}))
+
+  if (!response.ok) {
+    const error = new Error(
+      data.message || `API request failed (${response.status}).`
+    )
+
+    error.status = response.status
+    error.data = data
+
+    throw error
+  }
+
+  return data
+}
+
+===== frontend/src/services/auth.service.js =====
+import { apiRequest } from "./api"
+
+export function getBackendIdentity(token) {
+  return apiRequest("/api/v1/auth/me", {
+    method: "GET",
+    token,
+  })
+}
+
+export function registerMember(token, memberData) {
+  return apiRequest("/api/v1/auth/register", {
+    method: "POST",
+    token,
+    body: JSON.stringify(memberData),
+  })
+}
+
+===== frontend/src/features/auth/LoginPage.jsx =====
+import { useState } from "react"
+
+function LoginPage({ onLogin }) {
+  const [coinTilt, setCoinTilt] = useState({ x: 12, y: -16 })
+
+  const handleCoinMove = (event) => {
+    const rect = event.currentTarget.getBoundingClientRect()
+    const x = (event.clientX - rect.left) / rect.width
+    const y = (event.clientY - rect.top) / rect.height
+
+    setCoinTilt({
+      x: 12 + (0.5 - y) * 25,
+      y: -16 + (x - 0.5) * 30,
+    })
+  }
+
+  return (
+    <main className="app-shell">
+      <div className="ambient ambient-one" />
+      <div className="ambient ambient-two" />
+      <div className="ambient ambient-three" />
+      <div className="grid-overlay" />
+
+      <nav className="navbar">
+        <a className="brand" href="#">
+          <span className="brand-symbol">S</span>
+          <span>SHGT<span className="brand-dot">.</span></span>
+        </a>
+
+        <div className="nav-status">
+          <span className="status-indicator" />
+          Secure blockchain platform
+        </div>
+      </nav>
+
+      <section className="main-content">
+        <div className="hero-section">
+          <div className="eyebrow">
+            <span className="eyebrow-line" />
+            FINANCIAL FREEDOM, TOGETHER
+          </div>
+
+          <h1>
+            Empowering
+            <br />
+            communities.
+            <br />
+            <span className="gradient-text">Building futures.</span>
+          </h1>
+
+          <p className="hero-description">
+            A smarter way to save, collaborate and access
+            community-driven microfinance. Built on trust,
+            powered by blockchain.
+          </p>
+
+          <div className="feature-list">
+            <div className="feature">
+              <span className="feature-icon">?</span>
+              <span>Transparent transactions</span>
+            </div>
+            <div className="feature">
+              <span className="feature-icon">?</span>
+              <span>Community-powered savings</span>
+            </div>
+            <div className="feature">
+              <span className="feature-icon">?</span>
+              <span>Secure digital identity</span>
+            </div>
+          </div>
+
+          <div
+            className="visual-stage"
+            onPointerMove={handleCoinMove}
+            onPointerLeave={() => setCoinTilt({ x: 12, y: -16 })}
+          >
+            <div className="orbit orbit-outer" />
+            <div className="orbit orbit-middle" />
+            <div className="orbit orbit-inner" />
+
+            <div className="floating-symbol symbol-one">?</div>
+            <div className="floating-symbol symbol-two">?</div>
+            <div className="floating-symbol symbol-three">?</div>
+
+            <div className="coin-shadow" />
+
+            <div
+              className="coin"
+              style={{
+                transform: `rotateX(${coinTilt.x}deg) rotateY(${coinTilt.y}deg)`,
+              }}
+            >
+              <div className="coin-edge" />
+              <div className="coin-face">
+                <div className="coin-inner">
+                  <span className="coin-letter">S</span>
+                  <span className="coin-name">SHGT</span>
+                  <span className="coin-stars">? � ? � ?</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="visual-caption">
+              <span className="caption-line" />
+              TRUST THROUGH TECHNOLOGY
+            </div>
+          </div>
+        </div>
+
+        <div className="auth-section">
+          <div className="auth-card">
+            <div className="card-top-glow" />
+
+            <div className="card-icon">
+              <span>?</span>
+            </div>
+
+            <div className="card-eyebrow">YOUR COMMUNITY. YOUR FUTURE.</div>
+
+            <h2>Welcome to SHGT</h2>
+
+            <p className="card-description">
+              Sign in securely to access your community's
+              savings and financial services.
+            </p>
+
+            <button className="primary-button" onClick={onLogin}>
+              <span>Continue to SHGT</span>
+              <span className="button-arrow">?</span>
+            </button>
+
+            <div className="login-methods">
+              <span>EMAIL</span>
+              <i />
+              <span>GOOGLE</span>
+              <i />
+              <span>PASSKEY</span>
+            </div>
+
+            <div className="security-note">
+              <span className="lock-icon">?</span>
+              Protected by secure embedded wallet technology
+            </div>
+          </div>
+
+          <p className="outside-caption">
+            TRUSTED TECHNOLOGY. STRONGER COMMUNITIES.
+          </p>
+        </div>
+      </section>
+
+      <footer className="footer">
+        <span>� 2026 SHGT PROJECT</span>
+        <span>SECURE � TRANSPARENT � COMMUNITY FIRST</span>
+      </footer>
+    </main>
+  )
+}
+
+export default LoginPage
+
+===== frontend/src/features/auth/RegistrationForm.jsx =====
+import { useState } from "react"
+import "./RegistrationForm.css"
+function RegistrationForm({
+  initialEmail = "",
+  loading,
+  error,
+  onSubmit,
+  onLogout,
+}) {
+  const [fullName, setFullName] = useState("")
+  const [phoneNumber, setPhoneNumber] = useState("")
+  const [email, setEmail] = useState(initialEmail)
+
+  const handleSubmit = async (event) => {
+    event.preventDefault()
+    console.log("REGISTRATION FORM SUBMITTED")
+
+    await onSubmit({
+      fullName: fullName.trim(),
+      phoneNumber: phoneNumber.trim(),
+      email: email.trim(),
+    })
+  }
+
+  return (
+    <main className="registration-shell">
+      <div className="registration-card">
+        <div className="brand">
+          <span className="brand-symbol">S</span>
+          <span>
+            SHGT<span className="brand-dot">.</span>
+          </span>
+        </div>
+
+        <div className="card-eyebrow">MEMBER REGISTRATION</div>
+
+        <h1>Complete your SHGT profile</h1>
+
+        <p>
+          Your Privy identity has been authenticated. Add your basic
+          details to create your SHGT member account.
+        </p>
+
+        <form onSubmit={handleSubmit}>
+          <label htmlFor="fullName">Full name *</label>
+          <input
+            id="fullName"
+            type="text"
+            value={fullName}
+            onChange={(event) => setFullName(event.target.value)}
+            minLength={2}
+            maxLength={150}
+            autoComplete="name"
+            required
+            disabled={loading}
+          />
+
+          <label htmlFor="phoneNumber">Phone number *</label>
+          <input
+            id="phoneNumber"
+            type="tel"
+            value={phoneNumber}
+            onChange={(event) => setPhoneNumber(event.target.value)}
+            placeholder="+919876543210"
+            autoComplete="tel"
+            minLength={10}
+            required
+            disabled={loading}
+          />
+
+          <label htmlFor="email">Contact email</label>
+          <input
+            id="email"
+            type="email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            placeholder="Optional"
+            maxLength={254}
+            autoComplete="email"
+            disabled={loading}
+          />
+
+          {error && (
+            <p className="registration-error" role="alert">
+              {error}
+            </p>
+          )}
+
+          <button
+            className="primary-button"
+            type="submit"
+            disabled={
+              loading ||
+              fullName.trim().length < 2 ||
+              phoneNumber.trim().length < 10 ||
+              (email.trim() !== "" &&
+                !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
+
+            }
+          >
+            {loading ? "Creating your account..." : "Complete registration"}
+          </button>
+        </form>
+
+        <div className="registration-notice">
+          <strong>What happens next?</strong>
+          <p>
+            Your SHGT account will be created as ACTIVE, while your
+            identity verification starts as PENDING.
+          </p>
+          <p>
+            Financial services requiring KYC or SHG membership
+            authorization remain unavailable until their respective
+            requirements are satisfied.
+          </p>
+        </div>
+
+        <button className="logout-button" onClick={onLogout}>
+          Sign out
+        </button>
+      </div>
+    </main>
+  )
+}
+
+console.log("RegistrationForm rendered")
+export default RegistrationForm
+
+===== frontend/src/features/dashboard/MemberDashboard.jsx =====
+import DashboardSidebar from "./components/DashboardSidebar"
+import DashboardHeader from "./components/DashboardHeader"
+import MetricCard from "../../components/MetricCard"
+import EmptyPage from "../../components/EmptyPage"
+
+function MemberDashboard({
+  user,
+  wallet,
+  hasPasskey,
+  linking,
+  message,
+  onLinkPasskey,
+  onLogout,
+  activeTab,
+  setActiveTab,
+  backendIdentity,
+  backendLoading,
+  backendError,
+}) {
+  return (
+    <main className="dashboard-shell">
+      <div className="ambient ambient-one" />
+      <div className="ambient ambient-two" />
+
+      <DashboardSidebar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        onLogout={onLogout}
+      />
+
+      <section className="dashboard-main">
+        <DashboardHeader
+          user={user}
+          activeTab={activeTab}
+        />
+
+        <section className="dashboard-panel">
+          <h3>Backend identity verification</h3>
+
+          {backendLoading && <p>Verifying your identity...</p>}
+
+          {backendError && (
+            <p role="alert">{backendError}</p>
+          )}
+
+          {backendIdentity && (
+            <>
+              <p>Privy authentication: Verified</p>
+
+              <p>
+                SHGT registration:{" "}
+                {backendIdentity.registered ? "Registered" : "Pending"}
+              </p>
+
+              {backendIdentity.accountStatus && (
+                <p>
+                  Account status: {backendIdentity.accountStatus}
+                </p>
+              )}
+
+              {backendIdentity.userId && (
+                <p>
+                  SHGT user ID: {backendIdentity.userId}
+                </p>
+              )}
+            </>
+          )}
+        </section>
+
+        {activeTab === "Overview" && (
+          <>
+            <section className="welcome-banner">
+              <div>
+                <span className="banner-eyebrow">
+                  YOUR FINANCIAL COMMUNITY
+                </span>
+
+                <h2>Welcome to your SHGT workspace.</h2>
+
+                <p>
+                  Your savings, group contributions and loan information
+                  will appear here once your SHG membership is connected.
+                </p>
+              </div>
+
+              <div className="banner-emblem">S</div>
+            </section>
+
+            <div className="section-heading">
+              <div>
+                <h2>Financial overview</h2>
+                <p>Your account information and financial activity.</p>
+              </div>
+
+              <span className="preview-label">
+                AWAITING DATA CONNECTION
+              </span>
+            </div>
+
+            <div className="metric-grid">
+              <MetricCard
+                icon="?"
+                label="Total savings"
+                value="Not connected"
+                note="Oracle account data pending"
+              />
+
+              <MetricCard
+                icon="?"
+                label="Active loans"
+                value="Not connected"
+                note="Loan records pending"
+              />
+
+              <MetricCard
+                icon="?"
+                label="Group contributions"
+                value="Not connected"
+                note="SHG membership pending"
+              />
+
+              <MetricCard
+                icon="?"
+                label="Recent transactions"
+                value="Not connected"
+                note="Ledger integration pending"
+              />
+            </div>
+
+            <div className="dashboard-lower-grid">
+              <section className="dashboard-panel">
+                <div className="panel-heading">
+                  <div>
+                    <h3>Recent activity</h3>
+                    <p>Your latest account transactions</p>
+                  </div>
+                </div>
+
+                <div className="empty-state">
+                  <span className="empty-icon">?</span>
+                  <strong>No activity yet</strong>
+
+                  <p>
+                    Transactions will appear here after the ledger
+                    integration is connected.
+                  </p>
+                </div>
+              </section>
+
+              <section className="dashboard-panel wallet-panel">
+                <div className="panel-heading">
+                  <div>
+                    <h3>Wallet status</h3>
+                    <p>Your blockchain identity</p>
+                  </div>
+
+                  <span className="status-indicator" />
+                </div>
+
+                <div className="wallet-detail">
+                  <span>EMBEDDED WALLET</span>
+                  <strong>
+                    {wallet?.address || "Wallet unavailable"}
+                  </strong>
+                </div>
+
+                <div className="wallet-detail">
+                  <span>PRIVY ID</span>
+                  <strong>{user?.id || "Unavailable"}</strong>
+                </div>
+
+                <div className="wallet-badges">
+                  <span className={wallet ? "connected-badge" : "pending-badge"}>
+                    {wallet ? "Wallet connected" : "Wallet unavailable"}
+                  </span>
+
+                  <span className={hasPasskey ? "connected-badge" : "pending-badge"}>
+                    {hasPasskey ? "Passkey linked" : "Passkey not linked"}
+                  </span>
+                </div>
+
+                {!hasPasskey && (
+                  <button
+                    className="secondary-button dashboard-passkey"
+                    onClick={onLinkPasskey}
+                    disabled={linking}
+                  >
+                    {linking ? "Linking..." : "+ Link a passkey"}
+                  </button>
+                )}
+
+                {message && (
+                  <p className="feedback-message" role="status">
+                    {message}
+                  </p>
+                )}
+              </section>
+            </div>
+          </>
+        )}
+
+        {activeTab === "Savings" && (
+          <EmptyPage
+            icon="?"
+            title="Savings"
+            description="Your SHG savings accounts and contribution history will appear here once Oracle data integration is complete."
+          />
+        )}
+
+        {activeTab === "Loans" && (
+          <EmptyPage
+            icon="?"
+            title="Loans"
+            description="Loan applications, approvals, repayment schedules and outstanding balances will appear here."
+          />
+        )}
+
+        {activeTab === "Activity" && (
+          <EmptyPage
+            icon="?"
+            title="Transaction activity"
+            description="Your verified savings, contribution, loan and blockchain transactions will appear here."
+          />
+        )}
+      </section>
+    </main>
+  )
+}
+
+export default MemberDashboard
+
+===== BACKEND ROUTES AND SERVICES =====
+
+===== A:\PYTHON PROJECT\SHGT\code\backend\src\server.js =====
+
+const express = require("express");
+const cors = require("cors");
+const helmet = require("helmet");
+const morgan = require("morgan");
+require("dotenv").config();
+
+const authRoutes = require("./routes/auth.routes");
+
+const {
+    initializePool,
+    getConnection,
+    closePool
+} = require("./config/database");
+
+const app = express();
+
+app.use(helmet());
+
+app.use(cors({
+    origin: process.env.FRONTEND_URL || "http://localhost:5173"
+}));
+
+app.use(express.json());
+app.use(morgan("dev"));
+
+app.use("/api/v1/auth", authRoutes);
+
+// Basic API health check
+app.get("/", (req, res) => {
+    res.json({
+        message: "Welcome to SHGT Backend API",
+        status: "Running"
+    });
+});
+
+// Application health check
+app.get("/api/v1/health", (req, res) => {
+    res.json({
+        success: true,
+        message: "SHGT API is healthy"
+    });
+});
+
+// Oracle database health check
+app.get("/api/v1/health/database", async (req, res) => {
+    let connection;
+
+    try {
+        connection = await getConnection();
+
+        const result = await connection.execute(
+            "SELECT USER FROM DUAL"
+        );
+
+        res.json({
+            success: true,
+            message: "Oracle Database connected",
+            databaseUser: result.rows[0][0]
+        });
+    } catch (error) {
+        console.error("Database health check failed:", error.message);
+
+        res.status(503).json({
+            success: false,
+            message: "Database connection unavailable"
+        });
+    } finally {
+        if (connection) {
+            await connection.close();
+        }
+    }
+});
+
+const PORT = process.env.PORT || 5000;
+
+let server;
+
+async function startServer() {
+    // Database must be ready before the API starts.
+    await initializePool();
+
+    server = app.listen(PORT, () => {
+        console.log(`SHGT Backend running on http://localhost:${PORT}`);
+    });
+}
+
+async function shutdown(signal) {
+    console.log(`\n${signal} received. Shutting down SHGT...`);
+
+    if (server) {
+        server.close(async () => {
+            try {
+                await closePool();
+                console.log("SHGT shutdown completed.");
+                process.exit(0);
+            } catch (error) {
+                console.error("Shutdown error:", error.message);
+                process.exit(1);
+            }
+        });
+    } else {
+        await closePool();
+        process.exit(0);
+    }
+}
+
+process.once("SIGINT", () => shutdown("SIGINT"));
+process.once("SIGTERM", () => shutdown("SIGTERM"));
+
+startServer().catch(async (error) => {
+    console.error("SHGT startup failed:", error.message);
+
+    try {
+        await closePool();
+    } catch (closeError) {
+        console.error("Pool cleanup failed:", closeError.message);
+    }
+
+    process.exit(1);
+});
+
+===== A:\PYTHON PROJECT\SHGT\code\backend\src\config\database.js =====
+
+const oracledb = require("oracledb");
+const path = require("path");
+require("dotenv").config();
+
+let pool;
+
+async function initializePool() {
+    if (pool) {
+        return pool;
+    }
+
+    const walletLocation = path.resolve(
+        __dirname,
+        "../..",
+        process.env.DB_WALLET_LOCATION
+    );
+
+    try {
+        pool = await oracledb.createPool({
+            user: process.env.DB_USER,
+            password: process.env.DB_PASSWORD,
+            connectString: process.env.DB_CONNECT_STRING,
+
+            configDir: walletLocation,
+            walletLocation: walletLocation,
+            walletPassword: process.env.DB_WALLET_PASSWORD,
+
+            poolMin: 1,
+            poolMax: 5,
+            poolIncrement: 1,
+            poolTimeout: 60
+        });
+
+        console.log("Oracle connection pool initialized.");
+
+        return pool;
+    } catch (error) {
+        console.error(
+            "Oracle connection pool initialization failed:",
+            error.message
+        );
+
+        throw error;
+    }
+}
+
+async function getConnection() {
+    if (!pool) {
+        throw new Error("Oracle connection pool is not initialized.");
+    }
+
+    return pool.getConnection();
+}
+
+// Retained for the existing database test.
+async function connectDB() {
+    if (!pool) {
+        await initializePool();
+    }
+
+    return getConnection();
+}
+
+async function closePool() {
+    if (pool) {
+        await pool.close(10);
+        pool = undefined;
+        console.log("Oracle connection pool closed.");
+    }
+}
+
+module.exports = {
+    initializePool,
+    getConnection,
+    connectDB,
+    closePool
+};
+
+===== A:\PYTHON PROJECT\SHGT\code\backend\src\middleware\requirePrivyAuth.js =====
+const { PrivyClient, InvalidAuthTokenError } = require("@privy-io/node");
+
+const appId = process.env.PRIVY_APP_ID;
+const appSecret = process.env.PRIVY_APP_SECRET;
+
+if (!appId || !appSecret) {
+    throw new Error("Missing PRIVY_APP_ID or PRIVY_APP_SECRET.");
+}
+
+const privy = new PrivyClient({
+    appId,
+    appSecret
+});
+
+async function requirePrivyAuth(req, res, next) {
+    const authorization = req.headers.authorization;
+
+    if (!authorization || !authorization.startsWith("Bearer ")) {
+        return res.status(401).json({
+            success: false,
+            message: "Authentication token required."
+        });
+    }
+
+    const accessToken = authorization.slice(7).trim();
+
+    if (!accessToken) {
+        return res.status(401).json({
+            success: false,
+            message: "Authentication token is empty."
+        });
+    }
+
+    try {
+        const claims = await privy
+            .utils()
+            .auth()
+            .verifyAccessToken(accessToken);
+
+        if (!claims.user_id) {
+            return res.status(401).json({
+                success: false,
+                message: "Invalid authentication identity."
+            });
+        }
+
+        // This ID comes from the verified token, not the request body.
+        req.privyUserId = claims.user_id;
+
+        next();
+    } catch (error) {
+        if (
+            error instanceof InvalidAuthTokenError ||
+            error.name === "InvalidAuthTokenError"
+        ) {
+            return res.status(401).json({
+                success: false,
+                message: "Invalid or expired authentication token."
+            });
+        }
+
+        // A verifier/network failure is not automatically an invalid token.
+        console.error("Privy verification service error:", error.message);
+
+        return res.status(503).json({
+            success: false,
+            message: "Authentication service temporarily unavailable."
+        });
+    }
+}
+
+module.exports = requirePrivyAuth;
+
+===== A:\PYTHON PROJECT\SHGT\code\backend\src\routes\auth.routes.js =====
+
+const express = require("express");
+const oracledb = require("oracledb");
+
+const router = express.Router();
+
+const requirePrivyAuth = require("../middleware/requirePrivyAuth");
+const { getConnection } = require("../config/database");
+
+// Find an SHGT account using the verified Privy identity.
+async function findExistingMember(connection, privyUserId) {
+    const result = await connection.execute(
+        `SELECT USER_ID, ACCOUNT_STATUS
+         FROM SHGT_APP.USERS
+         WHERE PRIVY_USER_ID = :privyUserId`,
+        { privyUserId }
+    );
+
+    if (result.rows.length === 0) {
+        return null;
+    }
+
+    const [userId, accountStatus] = result.rows[0];
+
+    return { userId, accountStatus };
+}
+
+// Return the actual state of an existing account.
+function respondWithExistingMember(res, member) {
+    if (member.accountStatus !== "ACTIVE") {
+        return res.status(403).json({
+            success: false,
+            authenticated: true,
+            registered: true,
+            userId: member.userId,
+            accountStatus: member.accountStatus,
+            message: "This SHGT account is not active."
+        });
+    }
+
+    return res.status(200).json({
+        success: true,
+        authenticated: true,
+        registered: true,
+        userId: member.userId,
+        accountStatus: member.accountStatus,
+        message: "This Privy identity is already registered with SHGT."
+    });
+}
+
+
+// GET /api/v1/auth/me
+// Checks whether the authenticated Privy identity is registered.
+router.get("/me", requirePrivyAuth, async (req, res) => {
+    let connection;
+
+    try {
+        connection = await getConnection();
+
+        const member = await findExistingMember(
+            connection,
+            req.privyUserId
+        );
+
+        if (!member) {
+            return res.json({
+                success: true,
+                authenticated: true,
+                registered: false,
+                message: "Privy identity verified. SHGT registration is pending."
+            });
+        }
+
+        return respondWithExistingMember(res, member);
+
+    } catch (error) {
+        console.error(
+            "Authenticated identity lookup failed:",
+            error.message
+        );
+
+        return res.status(500).json({
+            success: false,
+            message: "Unable to retrieve member identity."
+        });
+
+    } finally {
+        if (connection) {
+            await connection.close();
+        }
+    }
+});
+
+
+// POST /api/v1/auth/register
+// Creates a user, member profile and pending KYC record atomically.
+router.post("/register", requirePrivyAuth, async (req, res) => {
+    let connection;
+    let transactionStarted = false;
+
+    try {
+        const {
+            fullName,
+            phoneNumber,
+            email
+        } = req.body || {};
+
+        // Validate full name.
+        if (
+            typeof fullName !== "string" ||
+            fullName.trim().length < 2 ||
+            fullName.trim().length > 150 ||
+            /[\u0000-\u001F\u007F]/.test(fullName)
+        ) {
+            return res.status(400).json({
+                success: false,
+                message: "Enter a valid full name (2-150 characters)."
+            });
+        }
+
+        const normalizedName = fullName.trim();
+
+        // Validate and normalize optional phone number.
+        let normalizedPhone = null;
+
+        if (phoneNumber !== undefined && phoneNumber !== null) {
+            if (typeof phoneNumber !== "string") {
+                return res.status(400).json({
+                    success: false,
+                    message: "Invalid phone number."
+                });
+            }
+
+            const cleanedPhone = phoneNumber
+                .trim()
+                .replace(/[\s()-]/g, "");
+
+            if (cleanedPhone.length > 0) {
+                if (!/^\+?[1-9]\d{7,14}$/.test(cleanedPhone)) {
+                    return res.status(400).json({
+                        success: false,
+                        message: "Enter a valid international phone number."
+                    });
+                }
+
+                normalizedPhone = cleanedPhone;
+            }
+        }
+
+        // Validate and normalize optional email.
+        let normalizedEmail = null;
+
+        if (email !== undefined && email !== null) {
+            if (typeof email !== "string") {
+                return res.status(400).json({
+                    success: false,
+                    message: "Invalid email address."
+                });
+            }
+
+            const cleanedEmail = email.trim().toLowerCase();
+
+            if (cleanedEmail.length > 0) {
+                if (
+                    cleanedEmail.length > 254 ||
+                    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanedEmail)
+                ) {
+                    return res.status(400).json({
+                        success: false,
+                        message: "Enter a valid email address."
+                    });
+                }
+
+                normalizedEmail = cleanedEmail;
+            }
+        }
+
+        // Identity comes exclusively from verified Privy middleware.
+        const privyUserId = req.privyUserId;
+
+        if (
+            typeof privyUserId !== "string" ||
+            privyUserId.length === 0 ||
+            privyUserId.length > 100
+        ) {
+            return res.status(401).json({
+                success: false,
+                message: "Invalid authenticated identity."
+            });
+        }
+
+        connection = await getConnection();
+
+        // Make ordinary registration retries idempotent.
+        const existingMember = await findExistingMember(
+            connection,
+            privyUserId
+        );
+
+        if (existingMember) {
+            return respondWithExistingMember(res, existingMember);
+        }
+
+        // Execute the restricted Oracle registration package.
+        // Direct table INSERT privileges are not required.
+        transactionStarted = true;
+
+        const result = await connection.execute(
+            `BEGIN
+                SHGT_APP.AUTH_REGISTRATION_PKG.REGISTER_MEMBER(
+                    P_PRIVY_USER_ID => :privyUserId,
+                    P_FULL_NAME     => :fullName,
+                    P_PHONE_NUMBER  => :phoneNumber,
+                    P_EMAIL         => :email,
+                    P_USER_ID       => :userId
+                );
+             END;`,
+            {
+                privyUserId: {
+                    val: privyUserId,
+                    type: oracledb.STRING,
+                    maxSize: 100
+                },
+                fullName: {
+                    val: normalizedName,
+                    type: oracledb.STRING,
+                    maxSize: 150
+                },
+                phoneNumber: {
+                    val: normalizedPhone,
+                    type: oracledb.STRING,
+                    maxSize: 20
+                },
+                email: {
+                    val: normalizedEmail,
+                    type: oracledb.STRING,
+                    maxSize: 254
+                },
+                userId: {
+                    dir: oracledb.BIND_OUT,
+                    type: oracledb.NUMBER
+                }
+            },
+            { autoCommit: false }
+        );
+
+        const userId = result.outBinds.userId;
+
+        // Commit only after the entire package succeeds.
+        await connection.commit();
+        transactionStarted = false;
+
+        return res.status(201).json({
+            success: true,
+            registered: true,
+            userId,
+            accountStatus: "ACTIVE",
+            verificationStatus: "PENDING",
+            message: "SHGT registration completed. Identity verification is pending."
+        });
+
+    } catch (error) {
+        // Roll back before attempting duplicate recovery.
+        let rollbackSucceeded = !transactionStarted;
+
+        if (connection && transactionStarted) {
+            try {
+                await connection.rollback();
+                transactionStarted = false;
+                rollbackSucceeded = true;
+
+            } catch (rollbackError) {
+                console.error(
+                    "Registration rollback failed:",
+                    rollbackError.message
+                );
+            }
+        }
+
+        // A unique violation may mean another request registered
+        // this same Privy identity while our request was executing.
+        if (error.errorNum === 1 && rollbackSucceeded && connection) {
+            try {
+                const existingMember = await findExistingMember(
+                    connection,
+                    req.privyUserId
+                );
+
+                if (existingMember) {
+                    return respondWithExistingMember(
+                        res,
+                        existingMember
+                    );
+                }
+
+                // The unique violation was not caused by an existing
+                // Privy identity. Do not misreport it as successful.
+                return res.status(409).json({
+                    success: false,
+                    registered: false,
+                    message: "Registration conflicts with an existing database record."
+                });
+
+            } catch (lookupError) {
+                console.error(
+                    "Duplicate registration recovery failed:",
+                    lookupError.message
+                );
+
+                return res.status(500).json({
+                    success: false,
+                    message: "Unable to verify registration status."
+                });
+            }
+        }
+
+        console.error(
+            "SHGT registration failed:",
+            error.message
+        );
+
+        return res.status(500).json({
+            success: false,
+            message: "Unable to complete SHGT registration. Please verify your account status before retrying."
+        });
+
+    } finally {
+        if (connection) {
+            try {
+                await connection.close();
+            } catch (closeError) {
+                console.error(
+                    "Registration connection cleanup failed:",
+                    closeError.message
+                );
+            }
+        }
+    }
+});
+
+module.exports = router;
+
+===== A:\PYTHON PROJECT\SHGT\code\backend\tests\database.test.js =====
+
+const {
+    connectDB,
+    closePool
+} = require("../src/config/database");
+
+async function testDatabase() {
+    let connection;
+
+    try {
+        connection = await connectDB();
+
+        const result = await connection.execute(
+            "SELECT USER FROM DUAL"
+        );
+
+        console.log("Connected database user:", result.rows[0][0]);
+        console.log("SHGT database test passed!");
+    } catch (error) {
+        console.error("Database test failed:", error.message);
+        process.exitCode = 1;
+    } finally {
+        if (connection) {
+            await connection.close();
+        }
+
+        await closePool();
+    }
+}
+
+testDatabase();

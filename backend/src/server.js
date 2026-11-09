@@ -5,6 +5,8 @@ const helmet = require("helmet");
 const morgan = require("morgan");
 require("dotenv").config();
 
+const authRoutes = require("./routes/auth.routes");
+
 const {
     initializePool,
     getConnection,
@@ -21,6 +23,8 @@ app.use(cors({
 
 app.use(express.json());
 app.use(morgan("dev"));
+
+app.use("/api/v1/auth", authRoutes);
 
 // Basic API health check
 app.get("/", (req, res) => {
