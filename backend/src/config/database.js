@@ -1,6 +1,7 @@
 
 const oracledb = require("oracledb");
 const path = require("path");
+
 require("dotenv").config();
 
 let pool;
@@ -23,7 +24,7 @@ async function initializePool() {
             connectString: process.env.DB_CONNECT_STRING,
 
             configDir: walletLocation,
-            walletLocation: walletLocation,
+            walletLocation,
             walletPassword: process.env.DB_WALLET_PASSWORD,
 
             poolMin: 1,

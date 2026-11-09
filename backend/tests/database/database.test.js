@@ -2,7 +2,7 @@
 const {
     connectDB,
     closePool
-} = require("../src/config/database");
+} = require("../../src/config/database");
 
 async function testDatabase() {
     let connection;
