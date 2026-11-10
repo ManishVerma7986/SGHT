@@ -5,7 +5,7 @@ const {
     createGroupMembersService
 } = require("../../src/services/group-members.service");
 
-const joinedDate = new Date("2025-03-10T00:00:00.000Z");
+const joinedDate = "2025-03-10";
 
 function row({
     membershipId = 101,
@@ -107,6 +107,7 @@ test("uses the required LEFT JOIN, ordering, and Oracle pagination", async () =>
     assert.doesNotMatch(sql, /INNER JOIN/i);
     assert.match(sql, /ORDER BY JOINED_DATE ASC NULLS LAST, MEMBERSHIP_ID ASC/);
     assert.match(sql, /OFFSET :offset ROWS\s+FETCH NEXT :fetchCount ROWS ONLY/);
+    assert.match(sql, /TO_CHAR\(M\.JOINED_DATE, 'YYYY-MM-DD'\) AS JOINED_DATE/);
     assert.deepEqual(harness.calls[1].binds, {
         groupId: 23,
         offset: 25,
@@ -248,7 +249,8 @@ test("rejects invalid IDs and pagination before using the authenticated read", a
         [42, 23, { page: 1, limit: 0 }],
         [42, 23, { page: 1, limit: 101 }],
         [42, 23, { page: 1.5, limit: 25 }],
-        [42, 23, { page: Number.MAX_SAFE_INTEGER, limit: 100 }]
+        [42, 23, { page: Number.MAX_SAFE_INTEGER, limit: 100 }],
+        [42, 23, { page: 1002, limit: 100 }]
     ]) {
         await assert.rejects(
             harness.findActiveGroupMembers(userId, groupId, options),
@@ -257,6 +259,45 @@ test("rejects invalid IDs and pagination before using the authenticated read", a
     }
 
     assert.deepEqual(harness.calls, []);
+});
+
+test("accepts the maximum permitted offset", async () => {
+    const harness = createHarness({ rows: [row()] });
+
+    const result = await harness.findActiveGroupMembers(42, 23, {
+        page: 1001,
+        limit: 100
+    });
+
+    assert.equal(harness.calls[1].binds.offset, 100000);
+    assert.equal(result.pagination.page, 1001);
+});
+
+test("accepts null and valid date-only values", async () => {
+    for (const date of ["2024-02-29", null]) {
+        const harness = createHarness({ rows: [row({ date })] });
+        const result = await harness.findActiveGroupMembers(42, 23);
+
+        assert.equal(result.members[0].joinedDate, date);
+    }
+});
+
+test("rejects invalid date-only values", async () => {
+    for (const date of [
+        "2025-02-29",
+        "2024-13-01",
+        "2024-04-31",
+        "2024-1-01",
+        "2024-01-01T00:00:00.000Z",
+        new Date("2024-01-01T00:00:00.000Z")
+    ]) {
+        const harness = createHarness({ rows: [row({ date })] });
+
+        await assert.rejects(
+            harness.findActiveGroupMembers(42, 23),
+            { message: "Group member directory data integrity error." }
+        );
+    }
 });
 
 test("propagates database errors from the authenticated read", async () => {

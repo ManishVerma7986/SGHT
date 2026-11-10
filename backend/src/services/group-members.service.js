@@ -3,6 +3,7 @@ const {
 } = require("./authenticated-transaction.service");
 
 const MAX_LIMIT = 100;
+const MAX_OFFSET = 100000;
 
 function isPositiveSafeInteger(value) {
     return typeof value === "number" &&
@@ -21,6 +22,7 @@ function isValidPagination(page, limit) {
 
     const offset = (page - 1) * limit;
     return Number.isSafeInteger(offset) &&
+        offset <= MAX_OFFSET &&
         Number.isSafeInteger(offset + limit + 1);
 }
 
@@ -52,8 +54,44 @@ function isSetFlag(value) {
 }
 
 function isValidJoinedDate(value) {
-    return value === null ||
-        value instanceof Date && !Number.isNaN(value.getTime());
+    if (value === null) {
+        return true;
+    }
+
+    const match = typeof value === "string"
+        ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+        : null;
+
+    if (!match) {
+        return false;
+    }
+
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+
+    if (year < 1 || month < 1 || month > 12) {
+        return false;
+    }
+
+    const isLeapYear = year % 4 === 0 &&
+        (year % 100 !== 0 || year % 400 === 0);
+    const daysPerMonth = [
+        31,
+        isLeapYear ? 29 : 28,
+        31,
+        30,
+        31,
+        30,
+        31,
+        31,
+        30,
+        31,
+        30,
+        31
+    ];
+
+    return day >= 1 && day <= daysPerMonth[month - 1];
 }
 
 function createGroupMembersService({
@@ -91,7 +129,7 @@ function createGroupMembersService({
                         P.FULL_NAME,
                         M.MEMBER_ROLE,
                         M.MEMBERSHIP_STATUS,
-                        M.JOINED_DATE
+                        TO_CHAR(M.JOINED_DATE, 'YYYY-MM-DD') AS JOINED_DATE
                     FROM SHGT_APP.SHG_MEMBERSHIPS M
                     LEFT JOIN SHGT_APP.MEMBER_PROFILES P
                       ON P.USER_ID = M.USER_ID

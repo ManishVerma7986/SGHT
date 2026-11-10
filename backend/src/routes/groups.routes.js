@@ -11,6 +11,7 @@ const {
 } = require("../services/group-members.service");
 
 const MAX_MEMBER_LIMIT = 100;
+const MAX_OFFSET = 100000;
 
 function parsePaginationValue(value, defaultValue) {
     if (value === undefined) {
@@ -42,6 +43,7 @@ function parsePagination(query) {
     const offset = (page - 1) * limit;
     if (
         !Number.isSafeInteger(offset) ||
+        offset > MAX_OFFSET ||
         !Number.isSafeInteger(offset + limit + 1)
     ) {
         return null;

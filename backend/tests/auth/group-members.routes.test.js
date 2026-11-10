@@ -20,7 +20,7 @@ const defaultMembers = [
         fullName: "Member One",
         memberRole: "MEMBER",
         membershipStatus: "ACTIVE",
-        joinedDate: "2025-03-10T00:00:00.000Z",
+        joinedDate: "2025-03-10",
         membershipId: 101,
         userId: 42,
         phoneNumber: "555-0101"
@@ -180,7 +180,7 @@ test("returns only approved directory fields to an active member", async () => {
             fullName: "Member One",
             memberRole: "MEMBER",
             membershipStatus: "ACTIVE",
-            joinedDate: "2025-03-10T00:00:00.000Z"
+            joinedDate: "2025-03-10"
         }],
         pagination: {
             page: 1,
@@ -266,6 +266,7 @@ test("rejects invalid pagination values", async () => {
         "?page=1.5",
         "?page=9007199254740992",
         "?page=9007199254740991&limit=100",
+        "?page=1002&limit=100",
         "?limit=0",
         "?limit=-1",
         "?limit=1.5",
@@ -284,6 +285,20 @@ test("rejects invalid pagination values", async () => {
             query
         );
     }
+});
+
+test("accepts the maximum permitted pagination offset", async () => {
+    const harness = createHarness();
+
+    const response = await sendRequest(harness, {
+        query: "?page=1001&limit=100"
+    });
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(harness.calls[1].pagination, {
+        page: 1001,
+        limit: 100
+    });
 });
 
 test("uses default pagination and enforces the maximum limit", async () => {
