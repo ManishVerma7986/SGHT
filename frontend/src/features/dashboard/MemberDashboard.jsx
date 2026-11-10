@@ -9,6 +9,7 @@ function MemberDashboard({
   hasPasskey,
   linking,
   message,
+  messageIsError,
   onLinkPasskey,
   onLogout,
   activeTab,
@@ -138,11 +139,11 @@ function MemberDashboard({
 
                 <div className="empty-state">
                   <span className="empty-icon">◷</span>
-                  <strong>No activity yet</strong>
+                  <strong>Activity data is not connected</strong>
 
                   <p>
-                    Transactions will appear here after the ledger
-                    integration is connected.
+                    Verified transactions will appear here after the ledger
+                    integration is available.
                   </p>
                 </div>
               </section>
@@ -154,7 +155,14 @@ function MemberDashboard({
                     <p>Your blockchain identity</p>
                   </div>
 
-                  <span className="status-indicator" />
+                  <span
+                    className={
+                      wallet
+                        ? "status-indicator"
+                        : "status-indicator status-pending"
+                    }
+                    aria-hidden="true"
+                  />
                 </div>
 
                 <div className="wallet-detail">
@@ -182,15 +190,20 @@ function MemberDashboard({
                 {!hasPasskey && (
                   <button
                     className="secondary-button dashboard-passkey"
+                    type="button"
                     onClick={onLinkPasskey}
                     disabled={linking}
+                    aria-busy={linking}
                   >
                     {linking ? "Linking..." : "+ Link a passkey"}
                   </button>
                 )}
 
                 {message && (
-                  <p className="feedback-message" role="status">
+                  <p
+                    className={`feedback-message ${messageIsError ? "is-error" : ""}`}
+                    role={messageIsError ? "alert" : "status"}
+                  >
                     {message}
                   </p>
                 )}

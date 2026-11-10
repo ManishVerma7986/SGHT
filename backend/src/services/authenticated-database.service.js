@@ -1,90 +1,180 @@
+const { AsyncLocalStorage } = require("node:async_hooks");
 
 const {
-    getConnection
+    getConnection: defaultGetConnection
 } = require("../config/database");
 
 const {
-    setOracleUserContext,
-    clearOracleUserContext
+    setOracleUserContext: defaultSetOracleUserContext,
+    clearOracleUserContext: defaultClearOracleUserContext
 } = require("../security/oracle-context.service");
+
+function throwFailures(errors, message) {
+    const flattenedErrors = errors.flatMap((error) =>
+        error instanceof AggregateError
+            ? [...error.errors]
+            : [error]
+    );
+
+    if (flattenedErrors.length === 1) {
+        throw flattenedErrors[0];
+    }
+
+    throw new AggregateError(flattenedErrors, message, {
+        cause: flattenedErrors[0]
+    });
+}
 
 async function discardConnection(connection) {
     try {
         await connection.close({ drop: true });
     } catch (error) {
-        console.error(
-            "Failed to discard Oracle connection:",
-            error.message
-        );
+        return {
+            failed: true,
+            error
+        };
     }
+
+    return {
+        failed: false
+    };
 }
 
-async function withAuthenticatedConnection(userId, callback) {
-    if (typeof callback !== "function") {
-        throw new Error("Authenticated database callback is required.");
-    }
+function createAuthenticatedDatabaseService({
+    getConnection = defaultGetConnection,
+    setOracleUserContext = defaultSetOracleUserContext,
+    clearOracleUserContext = defaultClearOracleUserContext
+} = {}) {
+    const activeConnection = new AsyncLocalStorage();
 
-    const connection = await getConnection();
+    async function withAuthenticatedConnection(userId, callback) {
+        if (typeof callback !== "function") {
+            throw new Error("Authenticated database callback is required.");
+        }
 
-    // Establish context. Discard the connection if setup fails.
-    try {
-        await setOracleUserContext(connection, userId);
-    } catch (error) {
-        await discardConnection(connection);
-        throw error;
-    }
-
-    let result;
-    let operationError;
-
-    try {
-        result = await callback(connection);
-    } catch (error) {
-        operationError = error;
-    }
-
-    // Always clear the Oracle context before releasing the connection.
-    let cleanupError;
-
-    try {
-        await clearOracleUserContext(connection);
-    } catch (error) {
-        cleanupError = error;
-    }
-
-    if (cleanupError) {
-        await discardConnection(connection);
-
-        if (operationError) {
-            throw new AggregateError(
-                [operationError, cleanupError],
-                "Database operation and Oracle context cleanup both failed."
+        if (activeConnection.getStore()) {
+            throw new Error(
+                "Nested authenticated database operations are not supported."
             );
         }
 
-        throw cleanupError;
-    }
+        const connection = await getConnection();
 
-    try {
-        await connection.close();
-    } catch (closeError) {
-        if (operationError) {
-            throw new AggregateError(
-                [operationError, closeError],
-                "Database operation and connection release both failed."
+        try {
+            await setOracleUserContext(connection, userId);
+        } catch (setupError) {
+            const discardResult = await discardConnection(connection);
+
+            if (discardResult.failed) {
+                throwFailures(
+                    [setupError, discardResult.error],
+                    "Oracle context setup and connection discard both failed."
+                );
+            }
+
+            throw setupError;
+        }
+
+        let result;
+        let operationError;
+        let operationFailed = false;
+        let discardRequested = false;
+        const control = {
+            discardConnection() {
+                discardRequested = true;
+            }
+        };
+
+        try {
+            result = await activeConnection.run(
+                connection,
+                () => callback(connection, control)
+            );
+        } catch (error) {
+            operationFailed = true;
+            operationError = error;
+        }
+
+        let cleanupError;
+        let cleanupFailed = false;
+
+        try {
+            await clearOracleUserContext(connection);
+        } catch (error) {
+            cleanupFailed = true;
+            cleanupError = error;
+        }
+
+        if (cleanupFailed || discardRequested) {
+            const errors = [];
+
+            if (operationFailed) {
+                errors.push(operationError);
+            }
+
+            if (cleanupFailed) {
+                errors.push(cleanupError);
+            }
+
+            const discardResult = await discardConnection(connection);
+
+            if (discardResult.failed) {
+                errors.push(discardResult.error);
+            }
+
+            if (errors.length === 0) {
+                if (operationFailed) {
+                    throw operationError;
+                }
+
+                return result;
+            }
+
+            throwFailures(
+                errors,
+                "Database operation, Oracle context cleanup, or connection discard failed."
             );
         }
 
-        throw closeError;
+        try {
+            await connection.close();
+        } catch (releaseError) {
+            const errors = [];
+
+            if (operationFailed) {
+                errors.push(operationError);
+            }
+
+            errors.push(releaseError);
+
+            const discardResult = await discardConnection(connection);
+
+            if (discardResult.failed) {
+                errors.push(discardResult.error);
+            }
+
+            throwFailures(
+                errors,
+                "Database operation or connection release failed."
+            );
+        }
+
+        if (operationFailed) {
+            throw operationError;
+        }
+
+        return result;
     }
 
-    if (operationError) {
-        throw operationError;
-    }
-
-    return result;
+    return {
+        withAuthenticatedConnection
+    };
 }
+
+const authenticatedDatabaseService =
+    createAuthenticatedDatabaseService();
 
 module.exports = {
-    withAuthenticatedConnection
+    ...authenticatedDatabaseService,
+    createAuthenticatedDatabaseService
 };

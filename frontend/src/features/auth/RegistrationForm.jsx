@@ -1,5 +1,16 @@
-﻿import { useState } from "react"
+﻿
+import { useState } from "react"
 import "./RegistrationForm.css"
+
+function normalizePhoneForValidation(value) {
+  return value.trim().replace(/[\s()-]/g, "")
+}
+
+function isValidInternationalPhoneNumber(value) {
+  const normalized = normalizePhoneForValidation(value)
+  return /^\+[1-9]\d{7,14}$/.test(normalized)
+}
+
 function RegistrationForm({
   initialEmail = "",
   loading,
@@ -11,9 +22,25 @@ function RegistrationForm({
   const [phoneNumber, setPhoneNumber] = useState("")
   const [email, setEmail] = useState(initialEmail)
 
+  const trimmedFullName = fullName.trim()
+  const hasControlCharacters = Array.from(trimmedFullName).some(
+    (character) => {
+      const codePoint = character.codePointAt(0)
+      return codePoint <= 31 || codePoint === 127
+    }
+  )
+  const validFullName =
+    trimmedFullName.length >= 2 &&
+    trimmedFullName.length <= 150 &&
+    !hasControlCharacters
+  const validPhoneNumber = isValidInternationalPhoneNumber(phoneNumber)
+
   const handleSubmit = async (event) => {
     event.preventDefault()
-    console.log("REGISTRATION FORM SUBMITTED")
+
+    if (!validPhoneNumber || !validFullName) {
+      return
+    }
 
     await onSubmit({
       fullName: fullName.trim(),
@@ -53,6 +80,7 @@ function RegistrationForm({
             autoComplete="name"
             required
             disabled={loading}
+            aria-invalid={fullName.trim() !== "" && !validFullName}
           />
 
           <label htmlFor="phoneNumber">Phone number *</label>
@@ -63,10 +91,21 @@ function RegistrationForm({
             onChange={(event) => setPhoneNumber(event.target.value)}
             placeholder="+919876543210"
             autoComplete="tel"
-            minLength={10}
             required
             disabled={loading}
+            aria-describedby="phoneHelp"
+            aria-invalid={phoneNumber.trim() !== "" && !validPhoneNumber}
           />
+
+          <small id="phoneHelp">
+            Include your country code. Example: +919876543210
+          </small>
+
+          {phoneNumber.trim() !== "" && !validPhoneNumber && (
+            <p className="registration-error" role="alert">
+              Enter a valid international phone number.
+            </p>
+          )}
 
           <label htmlFor="email">Contact email</label>
           <input
@@ -91,11 +130,10 @@ function RegistrationForm({
             type="submit"
             disabled={
               loading ||
-              fullName.trim().length < 2 ||
-              phoneNumber.trim().length < 10 ||
+              !validFullName ||
+              !validPhoneNumber ||
               (email.trim() !== "" &&
                 !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
-
             }
           >
             {loading ? "Creating your account..." : "Complete registration"}
@@ -115,7 +153,11 @@ function RegistrationForm({
           </p>
         </div>
 
-        <button className="logout-button" onClick={onLogout}>
+        <button
+          className="logout-button"
+          type="button"
+          onClick={onLogout}
+        >
           Sign out
         </button>
       </div>
@@ -123,5 +165,4 @@ function RegistrationForm({
   )
 }
 
-console.log("RegistrationForm rendered")
 export default RegistrationForm

@@ -13,6 +13,10 @@ const requireShgtUser = require("../../src/middleware/requireShgtUser");
 const {
     withAuthenticatedConnection
 } = require("../../src/services/authenticated-database.service");
+const {
+    withAuthenticatedRead,
+    withAuthenticatedTransaction
+} = require("../../src/services/authenticated-transaction.service");
 
 test("Active SHGT identity receives and clears Oracle context", async () => {
     let connection;
@@ -90,6 +94,43 @@ test("Active SHGT identity receives and clears Oracle context", async () => {
 
         assert.equal(
             String(authenticatedUserId),
+            String(req.shgtUser.userId)
+        );
+
+        const readUserId = await withAuthenticatedRead(
+            req.shgtUser.userId,
+            async (authenticatedConnection) => {
+                const contextResult = await authenticatedConnection.execute(
+                    `SELECT SYS_CONTEXT(
+                        'SHGT_USER_CONTEXT',
+                        'USER_ID'
+                     )
+                     FROM DUAL`
+                );
+
+                return contextResult.rows[0][0];
+            }
+        );
+
+        assert.equal(String(readUserId), String(req.shgtUser.userId));
+
+        const committedUserId = await withAuthenticatedTransaction(
+            req.shgtUser.userId,
+            async (authenticatedConnection) => {
+                const contextResult = await authenticatedConnection.execute(
+                    `SELECT SYS_CONTEXT(
+                        'SHGT_USER_CONTEXT',
+                        'USER_ID'
+                     )
+                     FROM DUAL`
+                );
+
+                return contextResult.rows[0][0];
+            }
+        );
+
+        assert.equal(
+            String(committedUserId),
             String(req.shgtUser.userId)
         );
 

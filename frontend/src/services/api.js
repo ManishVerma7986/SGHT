@@ -23,11 +23,26 @@ export async function apiRequest(path, options = {}) {
     }
   )
 
-  const data = await response.json().catch(() => ({}))
+  let data
+
+  try {
+    data = await response.json()
+  } catch {
+    const error = new Error(
+      `API returned an invalid JSON response (${response.status}).`
+    )
+    error.status = response.status
+    throw error
+  }
+
+  if (!data || typeof data !== "object" || Array.isArray(data)) {
+    throw new Error(`API returned an invalid response (${response.status}).`)
+  }
 
   if (!response.ok) {
     const error = new Error(
-      data.message || `API request failed (${response.status}).`
+      (typeof data.message === "string" && data.message) ||
+        `API request failed (${response.status}).`
     )
 
     error.status = response.status

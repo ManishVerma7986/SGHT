@@ -136,6 +136,11 @@
   box-shadow: 0 0 12px #48e4a0;
 }
 
+.status-indicator.status-pending {
+  background: #94a3b8;
+  box-shadow: none;
+}
+
 /* Main layout */
 
 .main-content {
@@ -573,6 +578,12 @@
   box-shadow: 0 12px 32px rgba(91, 173, 255, 0.35);
 }
 
+.primary-button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+  transform: none;
+}
+
 .button-arrow {
   font-size: 21px;
 }
@@ -700,6 +711,10 @@
   font-size: 11px;
   line-height: 1.5;
   overflow-wrap: anywhere;
+}
+
+.feedback-message.is-error {
+  color: #ffb4b4;
 }
 
 .logout-button {
@@ -1472,9 +1487,23 @@
     margin: 0 0 16px;
   }
 
-  .sidebar-label,
-  .sidebar-bottom {
+  .sidebar-label {
     display: none;
+  }
+
+  .sidebar-bottom {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 8px;
+  }
+
+  .sidebar-security {
+    display: none;
+  }
+
+  .sidebar-logout {
+    width: auto;
+    margin: 0;
   }
 
   .dashboard-nav {

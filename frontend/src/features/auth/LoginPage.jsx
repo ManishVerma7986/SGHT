@@ -2,6 +2,22 @@
 
 function LoginPage({ onLogin }) {
   const [coinTilt, setCoinTilt] = useState({ x: 12, y: -16 })
+  const [loggingIn, setLoggingIn] = useState(false)
+  const [loginError, setLoginError] = useState("")
+
+  const handleLogin = async () => {
+    setLoggingIn(true)
+    setLoginError("")
+
+    try {
+      await onLogin()
+    } catch (error) {
+      console.error("SHGT login failed:", error)
+      setLoginError("Unable to start sign in. Please try again.")
+    } finally {
+      setLoggingIn(false)
+    }
+  }
 
   const handleCoinMove = (event) => {
     const rect = event.currentTarget.getBoundingClientRect()
@@ -71,6 +87,7 @@ function LoginPage({ onLogin }) {
 
           <div
             className="visual-stage"
+            aria-hidden="true"
             onPointerMove={handleCoinMove}
             onPointerLeave={() => setCoinTilt({ x: 12, y: -16 })}
           >
@@ -124,10 +141,22 @@ function LoginPage({ onLogin }) {
               savings and financial services.
             </p>
 
-            <button className="primary-button" onClick={onLogin}>
-              <span>Continue to SHGT</span>
+            <button
+              className="primary-button"
+              type="button"
+              onClick={handleLogin}
+              disabled={loggingIn}
+              aria-busy={loggingIn}
+            >
+              <span>{loggingIn ? "Opening secure sign in..." : "Continue to SHGT"}</span>
               <span className="button-arrow">→</span>
             </button>
+
+            {loginError && (
+              <p className="feedback-message is-error" role="alert">
+                {loginError}
+              </p>
+            )}
 
             <div className="login-methods">
               <span>EMAIL</span>

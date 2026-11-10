@@ -25,6 +25,7 @@ function App() {
 
   const [linking, setLinking] = useState(false)
   const [message, setMessage] = useState("")
+  const [messageIsError, setMessageIsError] = useState(false)
   const [activeTab, setActiveTab] = useState("Overview")
 
   const wallet = wallets.find(
@@ -60,13 +61,15 @@ function App() {
   const handleLinkPasskey = async () => {
     setLinking(true)
     setMessage("")
+    setMessageIsError(false)
 
     try {
       await linkPasskey()
       setMessage("Passkey linked successfully!")
     } catch (error) {
       console.error("Passkey linking failed:", error)
-      setMessage(error.message || "Passkey linking failed.")
+      setMessage("Unable to link your passkey. Please try again.")
+      setMessageIsError(true)
     } finally {
       setLinking(false)
     }
@@ -74,7 +77,6 @@ function App() {
 
   const handleRegistration = async (memberData) => {
     try {
-      console.log("APP RECEIVED REGISTRATION:", memberData)
       await submitRegistration(memberData)
     } catch {
       // The registration hook maintains and exposes the error state.
@@ -137,13 +139,6 @@ function App() {
       </main>
     )
   }
-  console.log("SHGT FRONTEND STATE:", {
-    authenticated,
-    backendLoading,
-    backendError,
-    identity,
-    accessDenied,
-  })
 
   if (!identity.registered) {
     return (
@@ -164,6 +159,7 @@ function App() {
       hasPasskey={hasPasskey}
       linking={linking}
       message={message}
+      messageIsError={messageIsError}
       onLinkPasskey={handleLinkPasskey}
       onLogout={logout}
       activeTab={activeTab}

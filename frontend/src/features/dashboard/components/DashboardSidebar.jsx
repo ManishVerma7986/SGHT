@@ -8,21 +8,23 @@
 
   return (
     <aside className="dashboard-sidebar">
-      <a className="brand" href="#">
+      <div className="brand">
         <span className="brand-symbol">S</span>
         <span>SHGT<span className="brand-dot">.</span></span>
-      </a>
+      </div>
 
       <div className="sidebar-label">MEMBER WORKSPACE</div>
 
-      <nav className="dashboard-nav">
+      <nav className="dashboard-nav" aria-label="Member workspace">
         {navigation.map((item) => (
           <button
             key={item.name}
+            type="button"
             className={`nav-item ${activeTab === item.name ? "active" : ""}`}
             onClick={() => setActiveTab(item.name)}
+            aria-current={activeTab === item.name ? "page" : undefined}
           >
-            <span className="nav-icon">{item.icon}</span>
+            <span className="nav-icon" aria-hidden="true">{item.icon}</span>
             {item.name}
             {activeTab === item.name && (
               <span className="nav-active-dot" />
@@ -33,11 +35,15 @@
 
       <div className="sidebar-bottom">
         <div className="sidebar-security">
-          <span className="status-indicator" />
-          Wallet infrastructure ready
+          <span className="status-indicator" aria-hidden="true" />
+          Account identity verified
         </div>
 
-        <button className="logout-button sidebar-logout" onClick={onLogout}>
+        <button
+          className="logout-button sidebar-logout"
+          type="button"
+          onClick={onLogout}
+        >
           Sign out <span>→</span>
         </button>
       </div>

@@ -3,15 +3,20 @@ const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
+
 require("dotenv").config();
 
 const authRoutes = require("./routes/auth.routes");
+const groupsRoutes = require("./routes/groups.routes");
 
 const {
     initializePool,
     getConnection,
     closePool
 } = require("./config/database");
+const {
+    createServerLifecycle
+} = require("./services/server-lifecycle.service");
 
 const app = express();
 
@@ -21,10 +26,11 @@ app.use(cors({
     origin: process.env.FRONTEND_URL || "http://localhost:5173"
 }));
 
-app.use(express.json());
+app.use(express.json({ limit: "32kb" }));
 app.use(morgan("dev"));
 
 app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/groups", groupsRoutes);
 
 // Basic API health check
 app.get("/", (req, res) => {
@@ -49,73 +55,105 @@ app.get("/api/v1/health/database", async (req, res) => {
     try {
         connection = await getConnection();
 
-        const result = await connection.execute(
-            "SELECT USER FROM DUAL"
-        );
+        await connection.execute("SELECT 1 FROM DUAL");
 
         res.json({
             success: true,
-            message: "Oracle Database connected",
-            databaseUser: result.rows[0][0]
+            message: "Oracle Database connected"
         });
     } catch (error) {
-        console.error("Database health check failed:", error.message);
+        console.error(
+            "Database health check failed:",
+            error.message
+        );
 
-        res.status(503).json({
-            success: false,
-            message: "Database connection unavailable"
-        });
+        if (!res.headersSent) {
+            res.status(503).json({
+                success: false,
+                message: "Database connection unavailable"
+            });
+        }
     } finally {
         if (connection) {
-            await connection.close();
+            try {
+                await connection.close();
+            } catch (error) {
+                console.error(
+                    "Health-check connection cleanup failed:",
+                    error.message
+                );
+            }
         }
     }
 });
 
+app.use("/api", (req, res) => {
+    res.status(404).json({
+        success: false,
+        message: "API endpoint not found."
+    });
+});
+
+app.use((error, req, res, next) => {
+    if (res.headersSent) {
+        return next(error);
+    }
+
+    const statusCode =
+        Number.isInteger(error.status) &&
+        error.status >= 400 &&
+        error.status < 500
+            ? error.status
+            : 500;
+
+    if (statusCode >= 500) {
+        console.error("Unhandled API error:", error.message);
+    }
+
+    const message = statusCode === 413
+        ? "Request body is too large."
+        : statusCode === 400
+            ? "Invalid request body."
+            : "Internal server error.";
+
+    return res.status(statusCode).json({
+        success: false,
+        message
+    });
+});
+
 const PORT = process.env.PORT || 5000;
+const SHUTDOWN_TIMEOUT_MS = 30_000;
 
-let server;
-
-async function startServer() {
-    // Database must be ready before the API starts.
-    await initializePool();
-
-    server = app.listen(PORT, () => {
-        console.log(`SHGT Backend running on http://localhost:${PORT}`);
+function createLifecycle() {
+    return createServerLifecycle({
+        app,
+        initializePool,
+        closePool,
+        port: PORT,
+        shutdownTimeoutMs: SHUTDOWN_TIMEOUT_MS
     });
 }
 
-async function shutdown(signal) {
-    console.log(`\n${signal} received. Shutting down SHGT...`);
+if (require.main === module) {
+    const lifecycle = createLifecycle();
 
-    if (server) {
-        server.close(async () => {
-            try {
-                await closePool();
-                console.log("SHGT shutdown completed.");
-                process.exit(0);
-            } catch (error) {
-                console.error("Shutdown error:", error.message);
-                process.exit(1);
-            }
+    for (const signal of ["SIGINT", "SIGTERM"]) {
+        process.once(signal, () => {
+            lifecycle.shutdown(signal).then((exitCode) => {
+                process.exitCode = exitCode;
+            });
         });
-    } else {
-        await closePool();
-        process.exit(0);
     }
+
+    lifecycle.start().catch(() => {
+        lifecycle.shutdown("STARTUP_FAILURE").then((exitCode) => {
+            process.exitCode = exitCode || 1;
+        });
+    });
 }
 
-process.once("SIGINT", () => shutdown("SIGINT"));
-process.once("SIGTERM", () => shutdown("SIGTERM"));
-
-startServer().catch(async (error) => {
-    console.error("SHGT startup failed:", error.message);
-
-    try {
-        await closePool();
-    } catch (closeError) {
-        console.error("Pool cleanup failed:", closeError.message);
-    }
-
-    process.exit(1);
-});
+module.exports = {
+    app,
+    createLifecycle
+};
