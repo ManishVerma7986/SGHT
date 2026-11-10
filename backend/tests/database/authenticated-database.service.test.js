@@ -12,8 +12,10 @@ function createHarness({
     discardError
 } = {}) {
     const calls = [];
+    const closeArguments = [];
     const connection = {
         async close(options) {
+            closeArguments.push(Array.from(arguments));
             calls.push(options?.drop ? "discard" : "release");
 
             if (options?.drop && discardError) {
@@ -49,6 +51,7 @@ function createHarness({
 
     return {
         calls,
+        closeArguments,
         connection,
         ...service
     };
@@ -71,6 +74,7 @@ test("sets and clears context before releasing a successful connection", async (
         "clear-context",
         "release"
     ]);
+    assert.deepEqual(harness.closeArguments, [[]]);
 });
 
 test("preserves an operation failure and still clears the context", async () => {
@@ -212,6 +216,7 @@ test("discards a connection when context setup fails", async () => {
         "set-context",
         "discard"
     ]);
+    assert.deepEqual(harness.closeArguments, [[{ drop: true }]]);
 });
 
 test("preserves context setup and discard errors", async () => {
@@ -230,6 +235,13 @@ test("preserves context setup and discard errors", async () => {
             return true;
         }
     );
+
+    assert.deepEqual(harness.calls, [
+        "acquire",
+        "set-context",
+        "discard"
+    ]);
+    assert.deepEqual(harness.closeArguments, [[{ drop: true }]]);
 });
 
 test("preserves connection release and discard errors", async () => {

@@ -1,14 +1,26 @@
 
 const crypto = require("crypto");
 
-function getHmacKey() {
-    const keyHex = process.env.SHGT_BACKEND_HMAC_KEY;
-
+function decodeHmacKey(keyHex) {
     if (!/^[0-9a-fA-F]{64}$/.test(keyHex || "")) {
         throw new Error("Backend HMAC key is missing or invalid.");
     }
 
-    return Buffer.from(keyHex, "hex");
+    const key = Buffer.from(keyHex, "hex");
+
+    if (key.length !== 32) {
+        throw new Error("Backend HMAC key is missing or invalid.");
+    }
+
+    return key;
+}
+
+function getHmacKey() {
+    return decodeHmacKey(process.env.SHGT_BACKEND_HMAC_KEY);
+}
+
+function validateHmacKey(keyHex = process.env.SHGT_BACKEND_HMAC_KEY) {
+    decodeHmacKey(keyHex);
 }
 
 function normalizeUserId(userId) {
@@ -23,12 +35,22 @@ function normalizeUserId(userId) {
     return String(userId);
 }
 
-function createHmacAssertion(userId) {
+function createHmacAssertion(userId, options = {}) {
     const normalizedUserId = normalizeUserId(userId);
     const key = getHmacKey();
 
-    const issuedAtEpoch = Math.floor(Date.now() / 1000);
-    const nonce = crypto.randomBytes(32).toString("hex").toUpperCase();
+    const issuedAtEpoch = options.issuedAtEpoch ??
+        Math.floor(Date.now() / 1000);
+    const nonce = options.nonce ??
+        crypto.randomBytes(32).toString("hex").toUpperCase();
+
+    if (!Number.isSafeInteger(issuedAtEpoch) || issuedAtEpoch <= 0) {
+        throw new Error("Invalid HMAC assertion timestamp.");
+    }
+
+    if (!/^[0-9A-F]{64}$/.test(nonce)) {
+        throw new Error("Invalid HMAC assertion nonce.");
+    }
 
     // Must match the canonical payload in SHGT_SECURITY_PKG.
     const payload = `${normalizedUserId}|${issuedAtEpoch}|${nonce}`;
@@ -48,5 +70,6 @@ function createHmacAssertion(userId) {
 }
 
 module.exports = {
-    createHmacAssertion
+    createHmacAssertion,
+    validateHmacKey
 };

@@ -2,6 +2,9 @@ import { useEffect, useState } from "react"
 
 import { apiRequest } from "../../../services/api"
 import { createGroupService } from "../../../services/group.service"
+import GroupCreationForm from "./GroupCreationForm"
+import GroupMembershipList from "./GroupMembershipList"
+import GroupRequestList from "./GroupRequestList"
 
 const groupService = createGroupService({ apiRequest })
 const DIRECTORY_PAGE_SIZE = 25
@@ -30,10 +33,10 @@ function isValidGroupData(groupResponse, membershipResponse, profileResponse, gr
     group.groupId === groupId &&
     typeof group.groupName === "string" &&
     typeof group.groupCode === "string" &&
+    typeof group.groupStatus === "string" &&
     membership &&
     membership.groupId === groupId &&
     typeof membership.memberRole === "string" &&
-    typeof membership.membershipStatus === "string" &&
     profile &&
     typeof profile.fullName === "string" &&
     profile.fullName.trim()
@@ -74,6 +77,23 @@ function GroupWorkspace({ getAccessToken, onLogout }) {
   const [directoryPage, setDirectoryPage] = useState(1)
   const [directoryRetry, setDirectoryRetry] = useState(0)
   const [sessionExpired, setSessionExpired] = useState(false)
+  const [requestRefresh, setRequestRefresh] = useState(0)
+  const refreshRequests = () => setRequestRefresh((value) => value + 1)
+
+  function groupRequestPanels() {
+    return (
+      <>
+        <GroupCreationForm
+          getAccessToken={getAccessToken}
+          onSubmitted={refreshRequests}
+        />
+        <GroupRequestList
+          getAccessToken={getAccessToken}
+          refreshKey={requestRefresh}
+        />
+      </>
+    )
+  }
 
   useEffect(() => {
     const controller = new AbortController()
@@ -278,7 +298,9 @@ function GroupWorkspace({ getAccessToken, onLogout }) {
   )
 
   function handleGroupChange(event) {
-    setSelectedGroupId(event.target.value)
+    setSelectedGroupId(
+      typeof event === "string" ? event : event.target.value
+    )
     setDirectoryPage(1)
     setGroupData(null)
     setDirectory(null)
@@ -287,82 +309,60 @@ function GroupWorkspace({ getAccessToken, onLogout }) {
 
   if (groupsLoading) {
     return (
-      <section className="dashboard-panel group-workspace" aria-busy="true">
-        <p role="status">Loading your groups...</p>
+      <section className="group-workspace" aria-label="Group management">
+        <section className="dashboard-panel" aria-busy="true">
+          <p role="status">Loading your groups...</p>
+        </section>
+        {groupRequestPanels()}
       </section>
     )
   }
 
   if (groupsError) {
     return (
-      <section className="dashboard-panel group-workspace">
-        <h2>Your groups</h2>
-        <p role="alert">{groupsError}</p>
-        {sessionExpired ? (
-          <button className="secondary-button" type="button" onClick={onLogout}>
-            Sign out
-          </button>
-        ) : (
-          <button
-            className="secondary-button"
-            type="button"
-            onClick={() => setGroupsRetry((retry) => retry + 1)}
-          >
-            Try again
-          </button>
-        )}
+      <section className="group-workspace" aria-label="Group management">
+        <section className="dashboard-panel">
+          <h2>Your groups</h2>
+          <p role="alert">{groupsError}</p>
+          {sessionExpired ? (
+            <button className="secondary-button" type="button" onClick={onLogout}>
+              Sign out
+            </button>
+          ) : (
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={() => setGroupsRetry((retry) => retry + 1)}
+            >
+              Try again
+            </button>
+          )}
+        </section>
+        {groupRequestPanels()}
       </section>
     )
   }
 
   if (groups.length === 0) {
     return (
-      <section className="dashboard-panel group-workspace">
-        <h2>Your groups</h2>
-        <div className="group-empty-state">
-          <strong>You are not currently a member of an active group.</strong>
-          <p>Your group information will appear here when an active membership is available.</p>
-        </div>
+      <section className="group-workspace" aria-label="Group management">
+        <GroupMembershipList
+          groups={groups}
+          selectedGroupId={selectedGroupId}
+          onSelect={handleGroupChange}
+        />
+        {groupRequestPanels()}
       </section>
     )
   }
 
   return (
-    <section className="group-workspace" aria-label="Group membership">
-      <section className="dashboard-panel group-picker-panel">
-        <div className="panel-heading">
-          <div>
-            <h2>Your group</h2>
-            <p>
-              {groups.length > 1
-                ? "Choose a group to view its information and members."
-                : "Your active group membership."}
-            </p>
-          </div>
-          {groups.length > 1 && (
-            <label className="group-picker">
-              <span className="visually-hidden">Select a group</span>
-              <select
-                value={selectedGroupId}
-                onChange={handleGroupChange}
-                aria-label="Select a group"
-              >
-                <option value="">Select a group</option>
-                {groups.map((group) => (
-                  <option key={group.groupId} value={group.groupId}>
-                    {group.groupName} ({group.groupCode})
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-        </div>
-        {groups.length === 1 && selectedGroup && (
-          <p className="selected-group-name">
-            {selectedGroup.groupName} <span>({selectedGroup.groupCode})</span>
-          </p>
-        )}
-      </section>
+    <section className="group-workspace" aria-label="Group management">
+      <GroupMembershipList
+        groups={groups}
+        selectedGroupId={selectedGroupId}
+        onSelect={handleGroupChange}
+      />
 
       {!selectedGroupId ? (
         <section className="dashboard-panel group-empty-state">
@@ -426,7 +426,11 @@ function GroupWorkspace({ getAccessToken, onLogout }) {
                   </div>
                   <div>
                     <dt>Membership status</dt>
-                    <dd>{groupData.membership.membershipStatus}</dd>
+                    <dd>{selectedGroup.membershipStatus}</dd>
+                  </div>
+                  <div>
+                    <dt>Group status</dt>
+                    <dd>{groupData.group.groupStatus}</dd>
                   </div>
                 </dl>
                 <p className="member-profile-name">
@@ -528,6 +532,7 @@ function GroupWorkspace({ getAccessToken, onLogout }) {
           )}
         </>
       )}
+      {groupRequestPanels()}
     </section>
   )
 }

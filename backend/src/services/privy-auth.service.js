@@ -1,5 +1,9 @@
 
-require("dotenv").config();
+const {
+    loadDeploymentEnvironment
+} = require("../config/environment");
+
+loadDeploymentEnvironment();
 
 const {
     PrivyClient,

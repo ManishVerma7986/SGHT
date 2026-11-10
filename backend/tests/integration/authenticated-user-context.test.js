@@ -18,7 +18,15 @@ const {
     withAuthenticatedTransaction
 } = require("../../src/services/authenticated-transaction.service");
 
-test("Active SHGT identity receives and clears Oracle context", async () => {
+const RUN_ORACLE_INTEGRATION =
+    process.env.SHGT_RUN_DEV_ORACLE_INTEGRATION === "1" &&
+    process.env.SHGT_DEPLOYMENT_PROFILE === "development";
+
+test("Active SHGT identity receives and clears Oracle context", {
+    skip: RUN_ORACLE_INTEGRATION
+        ? false
+        : "Set SHGT_RUN_DEV_ORACLE_INTEGRATION=1 and select the development profile."
+}, async () => {
     let connection;
 
     try {

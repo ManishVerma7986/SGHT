@@ -2,13 +2,17 @@
 const {
     createHmacAssertion
 } = require("./hmac.service");
+const {
+    getOracleSecurityPackage
+} = require("../config/deployment-profile");
 
 async function setOracleUserContext(connection, userId) {
     const assertion = createHmacAssertion(userId);
+    const securityPackage = getOracleSecurityPackage();
 
     await connection.execute(
         `BEGIN
-            SHGT_APP.SHGT_SECURITY_PKG.SET_USER_CONTEXT(
+            ${securityPackage}.SET_USER_CONTEXT(
                 P_USER_ID         => :userId,
                 P_ISSUED_AT_EPOCH => :issuedAtEpoch,
                 P_NONCE           => :nonce,
@@ -25,9 +29,11 @@ async function setOracleUserContext(connection, userId) {
 }
 
 async function clearOracleUserContext(connection) {
+    const securityPackage = getOracleSecurityPackage();
+
     await connection.execute(
         `BEGIN
-            SHGT_APP.SHGT_SECURITY_PKG.CLEAR_USER_CONTEXT;
+            ${securityPackage}.CLEAR_USER_CONTEXT;
          END;`
     );
 }

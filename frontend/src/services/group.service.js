@@ -11,6 +11,39 @@ function createGroupService({ apiRequest }) {
     })
   }
 
+  function getOwnGroupRequests(token, { signal } = {}) {
+    if (typeof token !== "string" || !token.trim()) {
+      throw new TypeError("An authenticated access token is required.")
+    }
+
+    return apiRequest("/api/v1/group-workflow/requests/mine", {
+      method: "GET",
+      token,
+      signal,
+    })
+  }
+
+  function submitGroupRequest(token, payload, { idempotencyKey, signal } = {}) {
+    if (typeof token !== "string" || !token.trim()) {
+      throw new TypeError("An authenticated access token is required.")
+    }
+    if (
+      typeof idempotencyKey !== "string" ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+        .test(idempotencyKey)
+    ) {
+      throw new TypeError("A valid request idempotency key is required.")
+    }
+
+    return apiRequest("/api/v1/group-workflow/requests", {
+      method: "POST",
+      token,
+      signal,
+      headers: { "Idempotency-Key": idempotencyKey },
+      body: JSON.stringify(payload),
+    })
+  }
+
   function getSelectedGroupData(token, groupId, { signal } = {}) {
     if (
       !Number.isSafeInteger(Number(groupId)) ||
@@ -65,6 +98,8 @@ function createGroupService({ apiRequest }) {
 
   return {
     getCurrentGroups,
+    submitGroupRequest,
+    getOwnGroupRequests,
     getSelectedGroupData,
     getGroupMembers,
   }

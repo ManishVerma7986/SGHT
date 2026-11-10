@@ -1,14 +1,21 @@
 
+const {
+    loadDeploymentEnvironment
+} = require("./environment");
+
+loadDeploymentEnvironment();
+
 const oracledb = require("oracledb");
 const path = require("path");
-
-require("dotenv").config({
-    path: path.resolve(__dirname, "..", "..", ".env")
-});
+const {
+    getDeploymentProfile
+} = require("./deployment-profile");
 
 let pool;
 
 async function initializePool() {
+    getDeploymentProfile();
+
     if (pool) {
         return pool;
     }

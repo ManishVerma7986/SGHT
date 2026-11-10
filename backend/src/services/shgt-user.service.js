@@ -1,53 +1,68 @@
 const {
     getConnection
 } = require("../config/database");
+const {
+    getOracleUsersTable
+} = require("../config/deployment-profile");
 
-async function findShgtUserByPrivyId(privyUserId) {
-    if (
-        typeof privyUserId !== "string" ||
-        !privyUserId.trim()
-    ) {
-        throw new Error("Valid Privy user ID is required.");
-    }
+function createShgtUserService({
+    getConnection: acquireConnection = getConnection
+} = {}) {
+    async function findShgtUserByPrivyId(privyUserId) {
+        if (
+            typeof privyUserId !== "string" ||
+            !privyUserId.trim()
+        ) {
+            throw new Error("Valid Privy user ID is required.");
+        }
 
-    let connection;
+        const usersTable = getOracleUsersTable();
+        let connection;
 
-    try {
-        connection = await getConnection();
+        try {
+            connection = await acquireConnection();
 
-        const result = await connection.execute(
-            `SELECT
+            const result = await connection.execute(
+                `SELECT
                 USER_ID,
                 ACCOUNT_STATUS
-             FROM SHGT_APP.USERS
+             FROM ${usersTable}
              WHERE PRIVY_USER_ID = :privyUserId`,
-            {
-                privyUserId: privyUserId.trim()
+                {
+                    privyUserId: privyUserId.trim()
+                }
+            );
+
+            if (result.rows.length === 0) {
+                return null;
             }
-        );
 
-        if (result.rows.length === 0) {
-            return null;
-        }
+            const userId = Number(result.rows[0][0]);
+            const accountStatus = result.rows[0][1];
 
-        const userId = Number(result.rows[0][0]);
-        const accountStatus = result.rows[0][1];
+            if (!Number.isSafeInteger(userId) || userId <= 0) {
+                throw new Error("Invalid SHGT user ID returned by database.");
+            }
 
-        if (!Number.isSafeInteger(userId) || userId <= 0) {
-            throw new Error("Invalid SHGT user ID returned by database.");
-        }
-
-        return {
-            userId,
-            accountStatus
-        };
-    } finally {
-        if (connection) {
-            await connection.close();
+            return {
+                userId,
+                accountStatus
+            };
+        } finally {
+            if (connection) {
+                await connection.close();
+            }
         }
     }
+
+    return {
+        findShgtUserByPrivyId
+    };
 }
 
+const shgtUserService = createShgtUserService();
+
 module.exports = {
-    findShgtUserByPrivyId
+    ...shgtUserService,
+    createShgtUserService
 };

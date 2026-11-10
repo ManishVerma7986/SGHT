@@ -1,88 +1,58 @@
+const test = require("node:test");
+const assert = require("node:assert/strict");
 
-const {
-    initializePool,
-    getConnection,
-    closePool
-} = require("../../src/config/database");
+const RUN_ORACLE_INTEGRATION =
+    process.env.SHGT_RUN_DEV_ORACLE_INTEGRATION === "1" &&
+    process.env.SHGT_DEPLOYMENT_PROFILE === "development";
 
-const {
-    withAuthenticatedConnection
-} = require("../../src/services/authenticated-database.service");
+test("HMAC Oracle context is set, cleared after errors, and isolated", {
+    skip: RUN_ORACLE_INTEGRATION
+        ? false
+        : "Set SHGT_RUN_DEV_ORACLE_INTEGRATION=1 and select the development profile."
+}, async () => {
+    const {
+        initializePool,
+        getConnection,
+        closePool
+    } = require("../../src/config/database");
+    const {
+        withAuthenticatedConnection
+    } = require("../../src/services/authenticated-database.service");
 
-async function testAuthenticatedContext() {
-    const result = await withAuthenticatedConnection(
-        21,
-        async (connection) => {
-            const query = await connection.execute(
-                `SELECT SYS_CONTEXT('SHGT_USER_CONTEXT', 'USER_ID')
-                 FROM DUAL`
-            );
-
-            return query.rows[0][0];
-        }
-    );
-
-    console.log("Authenticated USER_ID:", result);
-
-    if (String(result) !== "21") {
-        throw new Error("Incorrect Oracle user context.");
-    }
-}
-
-async function testContextCleanupAfterFailure() {
-    try {
-        await withAuthenticatedConnection(21, async () => {
-            throw new Error("EXPECTED_TEST_ERROR");
-        });
-
-        throw new Error("Expected database operation to fail.");
-    } catch (error) {
-        if (error.message !== "EXPECTED_TEST_ERROR") {
-            throw error;
-        }
-
-        console.log("Operation failure handled correctly.");
-    }
-}
-
-async function testContextIsolation() {
-    const connection = await getConnection();
-
-    try {
-        const query = await connection.execute(
-            `SELECT SYS_CONTEXT('SHGT_USER_CONTEXT', 'USER_ID')
-             FROM DUAL`
-        );
-
-        const remainingUserId = query.rows[0][0];
-
-        console.log("Context after cleanup:", remainingUserId);
-
-        if (remainingUserId !== null) {
-            throw new Error("SECURITY FAILURE: User context remains.");
-        }
-
-        console.log("Connection isolation verified.");
-    } finally {
-        await connection.close();
-    }
-}
-
-async function main() {
     try {
         await initializePool();
 
-        await testAuthenticatedContext();
-        await testContextCleanupAfterFailure();
-        await testContextIsolation();
+        const authenticatedUserId = await withAuthenticatedConnection(
+            21,
+            async (connection) => {
+                const result = await connection.execute(
+                    `SELECT SYS_CONTEXT('SHGT_USER_CONTEXT', 'USER_ID')
+                     FROM DUAL`
+                );
+                return result.rows[0][0];
+            }
+        );
+        assert.equal(String(authenticatedUserId), "21");
 
-        console.log("All modular HMAC tests passed.");
-    } catch (error) {
-        console.error("HMAC integration test failed:", error.message);
-        process.exitCode = 1;
+        const operationError = new Error("EXPECTED_TEST_ERROR");
+        await assert.rejects(
+            withAuthenticatedConnection(21, async () => {
+                throw operationError;
+            }),
+            (error) => error === operationError
+        );
+
+        const connection = await getConnection();
+        try {
+            const result = await connection.execute(
+                `SELECT SYS_CONTEXT('SHGT_USER_CONTEXT', 'USER_ID')
+                 FROM DUAL`
+            );
+            assert.equal(result.rows[0][0], null);
+        } finally {
+            await connection.close();
+        }
     } finally {
         await closePool();
     }
-}
-
-main();
+});

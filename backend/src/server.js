@@ -12,9 +12,16 @@ const {
 
 const authRoutes = require("./routes/auth.routes");
 const groupsRoutes = require("./routes/groups.routes");
+const { createProfileRouter } = require("./routes/profile.routes");
+const {
+    createGroupWorkflowRouter
+} = require("./routes/group-workflow.routes");
 const {
     createServerLifecycle
 } = require("./services/server-lifecycle.service");
+const {
+    logConfigurationDiagnostic
+} = require("./config/configuration-diagnostic.service");
 
 const app = express();
 
@@ -28,7 +35,9 @@ app.use(express.json({ limit: "32kb" }));
 app.use(morgan("dev"));
 
 app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/profile", createProfileRouter());
 app.use("/api/v1/groups", groupsRoutes);
+app.use("/api/v1/group-workflow", createGroupWorkflowRouter());
 
 // Basic API health check
 app.get("/", (req, res) => {
@@ -134,6 +143,8 @@ function createLifecycle() {
 }
 
 if (require.main === module) {
+    logConfigurationDiagnostic({ port: PORT });
+
     const lifecycle = createLifecycle();
 
     for (const signal of ["SIGINT", "SIGTERM"]) {

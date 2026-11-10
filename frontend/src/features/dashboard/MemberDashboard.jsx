@@ -1,6 +1,7 @@
 ﻿import DashboardSidebar from "./components/DashboardSidebar"
 import DashboardHeader from "./components/DashboardHeader"
 import GroupWorkspace from "./components/GroupWorkspace"
+import ProfileSummary from "../profile/ProfileSummary"
 import MetricCard from "../../components/MetricCard"
 import EmptyPage from "../../components/EmptyPage"
 
@@ -67,6 +68,8 @@ function MemberDashboard({
 
         {activeTab === "Overview" && (
           <>
+            <ProfileSummary getAccessToken={getAccessToken} />
+
             <section className="welcome-banner">
               <div>
                 <span className="banner-eyebrow">

@@ -48,6 +48,76 @@ test("loads the authenticated user's group list", async () => {
   }])
 })
 
+test("submits a group request with bearer token and stable idempotency key", async () => {
+  const response = {
+    success: true,
+    replayed: false,
+    request: { requestId: "request-id", status: "PENDING" },
+  }
+  const harness = createHarness({ responses: [response] })
+
+  assert.deepEqual(
+    await harness.service.submitGroupRequest(
+      "privy-token",
+      { groupName: "Hillview Group" },
+      { idempotencyKey: "2eb80bc1-45c8-4f20-a888-7757a8819975" }
+    ),
+    response
+  )
+  assert.deepEqual(harness.calls[0], {
+    path: "/api/v1/group-workflow/requests",
+    options: {
+      method: "POST",
+      token: "privy-token",
+      signal: undefined,
+      headers: {
+        "Idempotency-Key": "2eb80bc1-45c8-4f20-a888-7757a8819975",
+      },
+      body: JSON.stringify({ groupName: "Hillview Group" }),
+    },
+  })
+})
+
+test("loads only the authenticated user's group request history", async () => {
+  const response = {
+    success: true,
+    requests: [{ requestId: "request-1", status: "PENDING" }],
+  }
+  const controller = new AbortController()
+  const harness = createHarness({ responses: [response] })
+
+  assert.deepEqual(
+    await harness.service.getOwnGroupRequests(
+      "privy-token",
+      { signal: controller.signal }
+    ),
+    response
+  )
+  assert.deepEqual(harness.calls, [{
+    path: "/api/v1/group-workflow/requests/mine",
+    options: {
+      method: "GET",
+      token: "privy-token",
+      signal: controller.signal,
+    },
+  }])
+})
+
+test("rejects group request submission without authentication or idempotency key", async () => {
+  const harness = createHarness()
+  assert.throws(
+    () => harness.service.submitGroupRequest("", {}, {
+      idempotencyKey: "2eb80bc1-45c8-4f20-a888-7757a8819975",
+    }),
+    /authenticated access token/
+  )
+  assert.throws(
+    () => harness.service.submitGroupRequest("privy-token", {}, {}),
+    /idempotency key/
+  )
+  assert.deepEqual(harness.calls, [])
+})
+
 test("returns an empty group list without inventing a fallback group", async () => {
   const harness = createHarness({
     responses: [{ success: true, groups: [] }],

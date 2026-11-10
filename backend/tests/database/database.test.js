@@ -1,24 +1,29 @@
 
+const test = require("node:test");
 const {
     connectDB,
     closePool
 } = require("../../src/config/database");
 
-async function testDatabase() {
+const RUN_ORACLE_INTEGRATION =
+    process.env.SHGT_RUN_DEV_ORACLE_INTEGRATION === "1" &&
+    process.env.SHGT_DEPLOYMENT_PROFILE === "development";
+
+test("Oracle connection smoke check", {
+    skip: RUN_ORACLE_INTEGRATION
+        ? false
+        : "Set SHGT_RUN_DEV_ORACLE_INTEGRATION=1 and select the development profile."
+}, async () => {
     let connection;
 
     try {
         connection = await connectDB();
 
-        const result = await connection.execute(
-            "SELECT USER FROM DUAL"
-        );
-
-        console.log("Connected database user:", result.rows[0][0]);
-        console.log("SHGT database test passed!");
+        await connection.execute("SELECT 1 FROM DUAL");
     } catch (error) {
-        console.error("Database test failed:", error.message);
-        process.exitCode = 1;
+        throw new Error("Oracle connection smoke check failed.", {
+            cause: error
+        });
     } finally {
         if (connection) {
             await connection.close();
@@ -26,6 +31,4 @@ async function testDatabase() {
 
         await closePool();
     }
-}
-
-testDatabase();
+});
