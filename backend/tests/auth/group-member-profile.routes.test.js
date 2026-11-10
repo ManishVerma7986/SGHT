@@ -19,18 +19,21 @@ const PRIVY_USER_IDS = {
     inactive: "did:privy:inactive"
 };
 
-function createHarness({
-    membership = {
-        membershipId: 105,
-        groupId: 23,
-        memberRole: "MEMBER"
-    },
-    profileResult = {
-        authorized: true,
-        profile: { fullName: "Member Example" }
-    },
-    profileError
-} = {}) {
+function createHarness(options = {}) {
+    const {
+        membership = {
+            membershipId: 105,
+            groupId: 23,
+            memberRole: "MEMBER"
+        },
+        profileError
+    } = options;
+    const profileResult = Object.hasOwn(options, "profileResult")
+        ? options.profileResult
+        : {
+            authorized: true,
+            profile: { fullName: "Member Example" }
+        };
     const calls = [];
     const middlewareOrder = [];
 
@@ -259,6 +262,54 @@ test("returns 404 for a missing profile after confirming authorization", async (
         message: "Member profile not found."
     });
     assert.equal(harness.calls[1].operation, "findOwnGroupProfile");
+});
+
+test("returns 500 for missing or malformed service result contracts", async () => {
+    for (const profileResult of [
+        undefined,
+        null,
+        [],
+        "invalid",
+        { profile: { fullName: "Member Example" } },
+        { authorized: "true", profile: { fullName: "Member Example" } }
+    ]) {
+        const harness = createHarness({ profileResult });
+
+        const response = await sendRequest(harness);
+
+        assert.equal(response.status, 500);
+        assert.deepEqual(response.body, {
+            success: false,
+            message: "Internal server error."
+        });
+    }
+});
+
+test("returns 500 for invalid profile objects or full names", async () => {
+    for (const profile of [
+        undefined,
+        {},
+        [],
+        { fullName: "" },
+        { fullName: "   " },
+        { fullName: " Member Example" },
+        { fullName: "Member Example " }
+    ]) {
+        const harness = createHarness({
+            profileResult: {
+                authorized: true,
+                profile
+            }
+        });
+
+        const response = await sendRequest(harness);
+
+        assert.equal(response.status, 500);
+        assert.deepEqual(response.body, {
+            success: false,
+            message: "Internal server error."
+        });
+    }
 });
 
 test("fails closed with 500 for duplicate or malformed profile data", async () => {

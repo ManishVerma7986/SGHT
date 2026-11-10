@@ -167,6 +167,7 @@ function App() {
       backendIdentity={identity}
       backendLoading={backendLoading}
       backendError={backendError}
+      getAccessToken={getAccessToken}
     />
   )
 }

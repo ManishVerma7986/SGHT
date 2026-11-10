@@ -114,12 +114,24 @@ test("distinguishes a missing profile from invalid authorization context", async
             profile: null
         }
     );
+
+    const authorizationAndProfileBothAbsent = createHarness({
+        rows: [[0, 0, 0, null]]
+    });
+    assert.deepEqual(
+        await authorizationAndProfileBothAbsent.findOwnGroupProfile(42, 23),
+        {
+            authorized: false,
+            profile: null
+        }
+    );
 });
 
 test("rejects duplicate profiles and duplicate active memberships", async () => {
     for (const rows of [
         [[1, 1, 2, "Member Example"]],
-        [[2, 1, 1, "Member Example"]]
+        [[2, 1, 1, "Member Example"]],
+        [[1, 2, 1, "Member Example"]]
     ]) {
         const harness = createHarness({ rows });
 
@@ -130,15 +142,12 @@ test("rejects duplicate profiles and duplicate active memberships", async () => 
     }
 });
 
-test("rejects malformed rows, counts, and profile values", async () => {
+test("rejects missing and malformed rows", async () => {
     const malformedResults = [
         undefined,
         [],
         [[1, 1, 1]],
-        [[-1, 1, 1, "Member Example"]],
-        [[1, "invalid", 1, "Member Example"]],
-        [[1, 1, 1, null]],
-        [[1, 1, 1, "   "]]
+        [[-1, 1, 1, "Member Example"]]
     ];
 
     for (const rows of malformedResults) {
@@ -149,6 +158,65 @@ test("rejects malformed rows, counts, and profile values", async () => {
             (error) => error.code === INTEGRITY_ERROR_CODE
         );
     }
+});
+
+test("rejects invalid and unsafe membership, group, and profile counts", async () => {
+    for (const rows of [
+        [["invalid", 1, 1, "Member Example"]],
+        [[-1, 1, 1, "Member Example"]],
+        [[1, "invalid", 1, "Member Example"]],
+        [[1, -1, 1, "Member Example"]],
+        [[1, 1, "invalid", "Member Example"]],
+        [[1, 1, -1, "Member Example"]],
+        [[Number.MAX_SAFE_INTEGER + 1, 1, 1, "Member Example"]],
+        [[1, "9007199254740992", 1, "Member Example"]],
+        [[1, 1, "9007199254740992", "Member Example"]]
+    ]) {
+        const harness = createHarness({ rows });
+
+        await assert.rejects(
+            harness.findOwnGroupProfile(42, 23),
+            (error) => error.code === INTEGRITY_ERROR_CODE
+        );
+    }
+});
+
+test("rejects a profile count of one with a null full name", async () => {
+    const harness = createHarness({
+        rows: [[1, 1, 1, null]]
+    });
+
+    await assert.rejects(
+        harness.findOwnGroupProfile(42, 23),
+        (error) => error.code === INTEGRITY_ERROR_CODE
+    );
+});
+
+test("rejects empty, whitespace-only, and padded full names", async () => {
+    for (const fullName of ["", "   ", " Member Example", "Member Example "]) {
+        const harness = createHarness({
+            rows: [[1, 1, 1, fullName]]
+        });
+
+        await assert.rejects(
+            harness.findOwnGroupProfile(42, 23),
+            (error) => error.code === INTEGRITY_ERROR_CODE
+        );
+    }
+});
+
+test("does not evaluate profile absence when authorization is absent", async () => {
+    const harness = createHarness({
+        rows: [[0, 0, "invalid-profile-count", null]]
+    });
+
+    assert.deepEqual(
+        await harness.findOwnGroupProfile(42, 23),
+        {
+            authorized: false,
+            profile: null
+        }
+    );
 });
 
 test("rejects invalid IDs before entering the authenticated read", async () => {

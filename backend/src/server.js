@@ -4,16 +4,14 @@ const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
 
-require("dotenv").config();
-
-const authRoutes = require("./routes/auth.routes");
-const groupsRoutes = require("./routes/groups.routes");
-
 const {
     initializePool,
     getConnection,
     closePool
 } = require("./config/database");
+
+const authRoutes = require("./routes/auth.routes");
+const groupsRoutes = require("./routes/groups.routes");
 const {
     createServerLifecycle
 } = require("./services/server-lifecycle.service");

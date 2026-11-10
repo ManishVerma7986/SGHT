@@ -1,5 +1,6 @@
 ﻿import DashboardSidebar from "./components/DashboardSidebar"
 import DashboardHeader from "./components/DashboardHeader"
+import GroupWorkspace from "./components/GroupWorkspace"
 import MetricCard from "../../components/MetricCard"
 import EmptyPage from "../../components/EmptyPage"
 
@@ -17,6 +18,7 @@ function MemberDashboard({
   backendIdentity,
   backendLoading,
   backendError,
+  getAccessToken,
 }) {
   return (
     <main className="dashboard-shell">
@@ -59,11 +61,6 @@ function MemberDashboard({
                 </p>
               )}
 
-              {backendIdentity.userId && (
-                <p>
-                  SHGT user ID: {backendIdentity.userId}
-                </p>
-              )}
             </>
           )}
         </section>
@@ -86,6 +83,11 @@ function MemberDashboard({
 
               <div className="banner-emblem">S</div>
             </section>
+
+            <GroupWorkspace
+              getAccessToken={getAccessToken}
+              onLogout={onLogout}
+            />
 
             <div className="section-heading">
               <div>

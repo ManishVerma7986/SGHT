@@ -103,7 +103,6 @@ function createGroupMemberProfileService({
             ] = result.rows[0];
             const membershipCount = parseOracleCount(membershipCountValue);
             const activeGroupCount = parseOracleCount(activeGroupCountValue);
-            const profileCount = parseOracleCount(profileCountValue);
 
             if (activeGroupCount > 1 || membershipCount > 1) {
                 throw createIntegrityError();
@@ -115,6 +114,8 @@ function createGroupMemberProfileService({
                     profile: null
                 };
             }
+
+            const profileCount = parseOracleCount(profileCountValue);
 
             if (profileCount > 1) {
                 throw createIntegrityError();
@@ -131,7 +132,11 @@ function createGroupMemberProfileService({
                 };
             }
 
-            if (typeof fullName !== "string" || !fullName.trim()) {
+            if (
+                typeof fullName !== "string" ||
+                !fullName.trim() ||
+                fullName !== fullName.trim()
+            ) {
                 throw createIntegrityError();
             }
 
