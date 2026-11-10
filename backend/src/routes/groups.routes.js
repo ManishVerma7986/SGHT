@@ -9,6 +9,10 @@ const {
 const {
     findActiveGroupMembers
 } = require("../services/group-members.service");
+const {
+    findOwnGroupProfile,
+    INTEGRITY_ERROR_CODE
+} = require("../services/group-member-profile.service");
 
 const MAX_MEMBER_LIMIT = 100;
 const MAX_OFFSET = 100000;
@@ -65,9 +69,81 @@ function createGroupsRouter({
     requireShgtUser: authorizeShgtUser = requireShgtUser,
     requireGroupMembership: authorizeGroupMembership = requireGroupMembership,
     findGroupOverview = findOverview,
-    findGroupMembers = findActiveGroupMembers
+    findGroupMembers = findActiveGroupMembers,
+    findGroupMemberProfile = findOwnGroupProfile
 } = {}) {
     const router = express.Router();
+
+    router.get(
+        "/:groupId/members/me",
+        authenticate,
+        authorizeShgtUser,
+        authorizeGroupMembership,
+        async (req, res) => {
+            try {
+                const result = await findGroupMemberProfile(
+                    req.shgtUser.userId,
+                    req.groupMembership.groupId
+                );
+
+                if (!result || result.authorized !== true) {
+                    return res.status(404).json({
+                        success: false,
+                        message: "Active membership in this group was not found."
+                    });
+                }
+
+                if (result.profile === null) {
+                    return res.status(404).json({
+                        success: false,
+                        message: "Member profile not found."
+                    });
+                }
+
+                if (
+                    typeof result.profile !== "object" ||
+                    Array.isArray(result.profile) ||
+                    typeof result.profile.fullName !== "string" ||
+                    !result.profile.fullName.trim()
+                ) {
+                    const error = new Error(
+                        "Group member profile response is invalid."
+                    );
+                    error.code = INTEGRITY_ERROR_CODE;
+                    throw error;
+                }
+
+                return res.status(200).json({
+                    success: true,
+                    profile: {
+                        fullName: result.profile.fullName
+                    }
+                });
+            } catch (error) {
+                if (error?.code === INTEGRITY_ERROR_CODE) {
+                    console.error(
+                        "Group member profile integrity check failed:",
+                        getErrorMessage(error)
+                    );
+
+                    return res.status(500).json({
+                        success: false,
+                        message: "Internal server error."
+                    });
+                }
+
+                console.error(
+                    "Group member profile lookup failed:",
+                    getErrorMessage(error)
+                );
+
+                return res.status(503).json({
+                    success: false,
+                    message: "Unable to retrieve member profile. Please try again."
+                });
+            }
+        }
+    );
 
     router.get(
         "/:groupId/members",
