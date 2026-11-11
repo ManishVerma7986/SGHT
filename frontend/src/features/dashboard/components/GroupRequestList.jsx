@@ -12,7 +12,7 @@ function isValidRequestsResponse(response) {
       request &&
       typeof request.requestId === "string" &&
       typeof request.status === "string" &&
-      ["PENDING", "APPROVED", "REJECTED"].includes(request.status) &&
+      ["PENDING", "APPROVED", "REJECTED", "WITHDRAWN"].includes(request.status) &&
       typeof request.payload?.groupName === "string"
     )
 }

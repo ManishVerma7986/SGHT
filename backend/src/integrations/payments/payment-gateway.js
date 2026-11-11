@@ -22,6 +22,7 @@ function createPaymentGateway({ provider } = {}) {
     if (
         !provider ||
         typeof provider.initiatePayment !== "function" ||
+        typeof provider.getPaymentStatus !== "function" ||
         typeof provider.verifyWebhook !== "function"
     ) {
         throw new TypeError("A payment provider adapter is required.");
@@ -82,7 +83,30 @@ function createPaymentGateway({ provider } = {}) {
         });
     }
 
-    return Object.freeze({ initiatePayment, verifyWebhook });
+    async function getPaymentStatus(providerReference) {
+        if (
+            typeof providerReference !== "string" ||
+            !providerReference.trim() ||
+            providerReference.length > 200
+        ) {
+            throw new TypeError("A valid payment provider reference is required.");
+        }
+        const result = await provider.getPaymentStatus(providerReference.trim());
+        if (
+            !result ||
+            !["INITIATED", "PENDING", "SUCCEEDED", "FAILED", "REVERSED"]
+                .includes(result.status) ||
+            result.providerReference !== providerReference.trim()
+        ) {
+            throw new TypeError("Payment provider returned an invalid status response.");
+        }
+        return Object.freeze({
+            status: result.status,
+            providerReference: result.providerReference
+        });
+    }
+
+    return Object.freeze({ initiatePayment, getPaymentStatus, verifyWebhook });
 }
 
 function createUnconfiguredPaymentGateway() {
@@ -91,6 +115,7 @@ function createUnconfiguredPaymentGateway() {
     };
     return Object.freeze({
         initiatePayment: unavailable,
+        getPaymentStatus: unavailable,
         verifyWebhook: unavailable
     });
 }

@@ -103,6 +103,90 @@ test("loads only the authenticated user's group request history", async () => {
   }])
 })
 
+test("submits a membership application with a stable idempotency key", async () => {
+  const response = {
+    success: true,
+    simulated: true,
+    replayed: false,
+    request: { requestId: "a".repeat(32), groupCode: "ACTIVE-01" },
+  }
+  const harness = createHarness({ responses: [response] })
+
+  assert.deepEqual(
+    await harness.service.submitMembershipRequest(
+      "privy-token",
+      "ACTIVE-01",
+      { idempotencyKey: "2eb80bc1-45c8-4f20-a888-7757a8819975" }
+    ),
+    response
+  )
+  assert.deepEqual(harness.calls[0], {
+    path: "/api/v1/group-workflow/membership-requests",
+    options: {
+      method: "POST",
+      token: "privy-token",
+      signal: undefined,
+      headers: {
+        "Idempotency-Key": "2eb80bc1-45c8-4f20-a888-7757a8819975",
+      },
+      body: JSON.stringify({ groupCode: "ACTIVE-01" }),
+    },
+  })
+})
+
+test("loads own and group-scoped membership requests", async () => {
+  const ownResponse = { success: true, requests: [] }
+  const pendingResponse = { success: true, requests: [] }
+  const harness = createHarness({ responses: [ownResponse, pendingResponse] })
+
+  assert.deepEqual(
+    await harness.service.getOwnMembershipRequests("privy-token"),
+    ownResponse
+  )
+  assert.deepEqual(
+    await harness.service.getPendingMembershipRequests(
+      "privy-token",
+      "ACTIVE-01"
+    ),
+    pendingResponse
+  )
+  assert.equal(
+    harness.calls[0].path,
+    "/api/v1/group-workflow/membership-requests/mine"
+  )
+  assert.equal(
+    harness.calls[1].path,
+    "/api/v1/group-workflow/groups/ACTIVE-01/membership-requests"
+  )
+})
+
+test("membership decisions and withdrawals use public request references", async () => {
+  const requestId = "a".repeat(32)
+  const decisionResponse = { success: true, request: { requestId } }
+  const withdrawalResponse = { success: true, request: { requestId } }
+  const harness = createHarness({
+    responses: [decisionResponse, withdrawalResponse],
+  })
+
+  await harness.service.decideMembershipRequest(
+    "privy-token",
+    requestId,
+    "APPROVED"
+  )
+  await harness.service.withdrawMembershipRequest("privy-token", requestId)
+  assert.equal(
+    harness.calls[0].path,
+    `/api/v1/group-workflow/membership-requests/${requestId}/decision`
+  )
+  assert.deepEqual(JSON.parse(harness.calls[0].options.body), {
+    decision: "APPROVED",
+  })
+  assert.equal(
+    harness.calls[1].path,
+    `/api/v1/group-workflow/membership-requests/${requestId}/withdraw`
+  )
+})
+
 test("rejects group request submission without authentication or idempotency key", async () => {
   const harness = createHarness()
   assert.throws(
@@ -114,6 +198,22 @@ test("rejects group request submission without authentication or idempotency key
   assert.throws(
     () => harness.service.submitGroupRequest("privy-token", {}, {}),
     /idempotency key/
+  )
+  assert.throws(
+    () => harness.service.submitMembershipRequest(
+      "privy-token",
+      "ACTIVE-01",
+      {}
+    ),
+    /idempotency key/
+  )
+  assert.throws(
+    () => harness.service.submitMembershipRequest(
+      "privy-token",
+      "bad group code",
+      { idempotencyKey: "2eb80bc1-45c8-4f20-a888-7757a8819975" }
+    ),
+    /group code/
   )
   assert.deepEqual(harness.calls, [])
 })

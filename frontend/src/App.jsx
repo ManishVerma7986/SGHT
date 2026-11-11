@@ -4,11 +4,27 @@ import { usePrivy, useWallets } from "@privy-io/react-auth"
 import LoginPage from "./features/auth/LoginPage"
 import RegistrationForm from "./features/auth/RegistrationForm"
 import MemberDashboard from "./features/dashboard/MemberDashboard"
+import DashboardDemoPage from "./features/dashboard/components/demo/DemoRoleDashboard.jsx"
+import PortalWorkspace from "./features/portal/components/PortalWorkspace.jsx"
+import {
+  createPortalDataService,
+  createPortalDemoProvider,
+} from "./features/portal/services/portal-data.service.js"
+import { createPortalApiProvider } from "./features/portal/services/portal-api.provider.js"
+import { apiRequest } from "./services/api.js"
 
 import { useBackendIdentity } from "./hooks/useBackendIdentity"
 import { useRegistration } from "./hooks/useRegistration"
 
 import "./App.css"
+
+const portalDataService = createPortalDataService({
+  providers: {
+    demo: createPortalDemoProvider(),
+    api: createPortalApiProvider({ apiRequest }),
+  },
+})
+const portalDataMode = import.meta.env.VITE_PORTAL_DATA_MODE || "demo"
 
 function App() {
   const {
@@ -150,6 +166,49 @@ function App() {
         onLogout={logout}
       />
     )
+  }
+
+  const searchParams = new URLSearchParams(window.location.search)
+  const requestedDemoRole = searchParams.get("dashboardDemo")
+  const requestedPortalModule = searchParams.get("portal")
+  const requestedMemberModule = searchParams.get("memberWorkspace")
+  const supportedDemoRoles = [
+    "PLATFORM_ADMIN",
+    "PRESIDENT",
+    "SECRETARY",
+    "TREASURER",
+  ]
+  if (
+    import.meta.env.DEV &&
+    supportedDemoRoles.includes(requestedDemoRole)
+  ) {
+    if (
+      requestedPortalModule &&
+      portalDataService.getAvailableModules(requestedDemoRole)
+        .includes(requestedPortalModule)
+    ) {
+      return <PortalWorkspace
+        role={requestedDemoRole}
+        moduleName={requestedPortalModule}
+        getAccessToken={getAccessToken}
+        dataService={portalDataService}
+      />
+    }
+    return <DashboardDemoPage role={requestedDemoRole} />
+  }
+
+  if (
+    import.meta.env.DEV &&
+    requestedMemberModule &&
+    portalDataService.getAvailableModules("MEMBER").includes(requestedMemberModule)
+  ) {
+    return <PortalWorkspace
+      role="MEMBER"
+      moduleName={requestedMemberModule}
+      mode={portalDataMode}
+      getAccessToken={getAccessToken}
+      dataService={portalDataService}
+    />
   }
 
   return (

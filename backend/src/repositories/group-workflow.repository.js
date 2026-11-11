@@ -15,7 +15,12 @@ function createUnavailableGroupWorkflowRepository() {
         findRequestsByUser: unavailable,
         findPendingRequests: unavailable,
         decideRequest: unavailable,
-        activateGroup: unavailable
+        activateGroup: unavailable,
+        submitMembershipRequest: unavailable,
+        findMembershipRequestsByUser: unavailable,
+        findPendingMembershipRequests: unavailable,
+        decideMembershipRequest: unavailable,
+        withdrawMembershipRequest: unavailable
     });
 }
 

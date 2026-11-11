@@ -8,11 +8,11 @@ const {
     createGroupWorkflowService
 } = require("../../src/services/group-workflow.service");
 
-function createService() {
+function createService(repositoryOptions = {}) {
     const repository = withRepositoryEnv({
         NODE_ENV: "test",
         SHGT_ENABLE_TEST_REPOSITORIES: "1"
-    }, () => createInMemoryGroupWorkflowRepository());
+    }, () => createInMemoryGroupWorkflowRepository(repositoryOptions));
 
     return createGroupWorkflowService({ repository });
 }
@@ -133,14 +133,24 @@ test("approval creates a draft group and activation is a separate admin decision
     );
     assert.equal(approved.request.status, "APPROVED");
     assert.equal(approved.request.decision.adminUserId, 99);
-    assert.ok(approved.request.decision.groupId);
+    assert.match(approved.request.decision.groupCode, /^TEST-GRP-/);
+    assert.equal(
+        approved.request.decision.creatorMembership.memberRole,
+        "MEMBER"
+    );
+    assert.equal(
+        approved.request.decision.creatorMembership.membershipStatus,
+        "ACTIVE"
+    );
 
     const activated = await service.activateGroup(
         99,
-        approved.request.decision.groupId
+        approved.request.decision.groupCode
     );
-    assert.equal(activated.group.groupStatus, "ACTIVE");
-    assert.equal(activated.group.activatedByUserId, 99);
+    assert.deepEqual(activated, {
+        conflict: true,
+        reason: "INITIAL_LEADERSHIP_REQUIRED"
+    });
 });
 
 test("rejection requires a reason and rejected requests cannot be activated", async () => {
@@ -160,6 +170,15 @@ test("rejection requires a reason and rejected requests cannot be activated", as
         ),
         { code: "INVALID_REJECTION_REASON" }
     );
+    await assert.rejects(
+        service.decideRequest(
+            99,
+            submitted.request.requestId,
+            "REJECTED",
+            "Too short"
+        ),
+        { code: "INVALID_REJECTION_REASON" }
+    );
     const rejected = await service.decideRequest(
         99,
         submitted.request.requestId,
@@ -169,7 +188,8 @@ test("rejection requires a reason and rejected requests cannot be activated", as
 
     assert.equal(rejected.request.status, "REJECTED");
     assert.equal(rejected.request.decision.reason, "Incomplete supporting details.");
-    assert.equal(rejected.request.decision.groupId, null);
+    assert.equal(rejected.request.decision.groupCode, null);
+    assert.equal(rejected.request.decision.creatorMembership, null);
 });
 
 test("terminal decisions replay only when identical and conflict otherwise", async () => {
@@ -187,7 +207,12 @@ test("terminal decisions replay only when identical and conflict otherwise", asy
         true
     );
     assert.deepEqual(
-        await service.decideRequest(100, requestId, "REJECTED", "No"),
+        await service.decideRequest(
+            100,
+            requestId,
+            "REJECTED",
+            "A different decision."
+        ),
         { conflict: true }
     );
 });
@@ -217,5 +242,203 @@ test("rejects invalid request fields, actor IDs, and decisions", async () => {
     await assert.rejects(
         service.decideRequest(99, "request", "ACTIVE"),
         /valid group request decision/
+    );
+});
+
+test("membership request lifecycle enforces president authority and idempotency", async () => {
+    const groupCode = "ACTIVE-GROUP-01";
+    const service = createService({
+        initialGroups: [{ groupCode, groupStatus: "ACTIVE" }],
+        initialMemberships: [{
+            groupCode,
+            userId: 99,
+            memberRole: "PRESIDENT",
+            membershipStatus: "ACTIVE"
+        }]
+    });
+    const membershipKey = "12eb80bc-45c8-4f20-a888-7757a8819975";
+    const submitted = await service.submitMembershipRequest(
+        41,
+        membershipKey,
+        groupCode
+    );
+
+    assert.equal(submitted.request.status, "PENDING");
+    assert.equal(submitted.request.groupCode, groupCode);
+    assert.equal(
+        (await service.submitMembershipRequest(
+            41,
+            membershipKey,
+            groupCode
+        )).replayed,
+        true
+    );
+    assert.deepEqual(
+        await service.findPendingMembershipRequests(88, groupCode),
+        { forbidden: true }
+    );
+    assert.deepEqual(
+        await service.findPendingMembershipRequests(99, groupCode),
+        {
+            requests: [submitted.request],
+            simulated: true
+        }
+    );
+    assert.deepEqual(
+        await service.decideMembershipRequest(
+            41,
+            submitted.request.requestId,
+            "APPROVED"
+        ),
+        { forbidden: true }
+    );
+
+    const approved = await service.decideMembershipRequest(
+        99,
+        submitted.request.requestId,
+        "APPROVED"
+    );
+    assert.equal(approved.request.status, "APPROVED");
+    assert.match(approved.request.decision.membershipRef, /^[0-9a-f]{32}$/);
+    assert.deepEqual(
+        await service.submitMembershipRequest(41, membershipKey, groupCode),
+        { request: approved.request, replayed: true, simulated: true }
+    );
+    assert.deepEqual(
+        await service.submitMembershipRequest(
+            41,
+            "22eb80bc-45c8-4f20-a888-7757a8819975",
+            groupCode
+        ),
+        { conflict: true }
+    );
+});
+
+test("delegated active secretary can review requests only for the bound leadership tenure", async () => {
+    const groupCode = "ACTIVE-GROUP-02";
+    const presidentMembershipRef = "a".repeat(32);
+    const delegateMembershipRef = "b".repeat(32);
+    const service = createService({
+        initialGroups: [{ groupCode, groupStatus: "ACTIVE" }],
+        initialMemberships: [{
+            groupCode,
+            userId: 99,
+            memberRole: "PRESIDENT",
+            membershipStatus: "ACTIVE",
+            membershipRef: presidentMembershipRef
+        }, {
+            groupCode,
+            userId: 98,
+            memberRole: "SECRETARY",
+            membershipStatus: "ACTIVE",
+            membershipRef: delegateMembershipRef
+        }],
+        initialDelegations: [{
+            groupCode,
+            presidentUserId: 99,
+            delegateUserId: 98,
+            presidentMembershipRef,
+            delegateMembershipRef
+        }]
+    });
+    const submitted = await service.submitMembershipRequest(
+        41,
+        "32eb80bc-45c8-4f20-a888-7757a8819975",
+        groupCode
+    );
+    const reviewed = await service.decideMembershipRequest(
+        98,
+        submitted.request.requestId,
+        "REJECTED",
+        "The required eligibility documents are missing."
+    );
+
+    assert.equal(reviewed.request.status, "REJECTED");
+    assert.equal(
+        reviewed.request.decision.reason,
+        "The required eligibility documents are missing."
+    );
+});
+
+test("membership request withdrawal is requester-only and terminal", async () => {
+    const groupCode = "ACTIVE-GROUP-03";
+    const service = createService({
+        initialGroups: [{ groupCode, groupStatus: "ACTIVE" }],
+        initialMemberships: [{
+            groupCode,
+            userId: 99,
+            memberRole: "PRESIDENT",
+            membershipStatus: "ACTIVE"
+        }]
+    });
+
+    const submitted = await service.submitMembershipRequest(
+        41,
+        "42eb80bc-45c8-4f20-a888-7757a8819975",
+        groupCode
+    );
+
+    assert.deepEqual(
+        await service.withdrawMembershipRequest(
+            99,
+            submitted.request.requestId
+        ),
+        { forbidden: true }
+    );
+    const withdrawn = await service.withdrawMembershipRequest(
+        41,
+        submitted.request.requestId
+    );
+    assert.equal(withdrawn.request.status, "WITHDRAWN");
+    assert.equal(
+        (await service.withdrawMembershipRequest(
+            41,
+            submitted.request.requestId
+        )).replayed,
+        true
+    );
+});
+
+test("membership rejection requires a substantive reason", async () => {
+    const groupCode = "ACTIVE-GROUP-04";
+    const service = createService({
+        initialGroups: [{ groupCode, groupStatus: "ACTIVE" }],
+        initialMemberships: [{
+            groupCode,
+            userId: 99,
+            memberRole: "PRESIDENT",
+            membershipStatus: "ACTIVE"
+        }]
+    });
+    const submitted = await service.submitMembershipRequest(
+        41,
+        "52eb80bc-45c8-4f20-a888-7757a8819975",
+        groupCode
+    );
+
+    await assert.rejects(
+        service.decideMembershipRequest(
+            99,
+            submitted.request.requestId,
+            "REJECTED",
+            "No"
+        ),
+        { code: "INVALID_REJECTION_REASON" }
+    );
+});
+
+test("membership applications are not accepted without an active president", async () => {
+    const groupCode = "ACTIVE-GROUP-05";
+    const service = createService({
+        initialGroups: [{ groupCode, groupStatus: "ACTIVE" }]
+    });
+
+    assert.deepEqual(
+        await service.submitMembershipRequest(
+            41,
+            "62eb80bc-45c8-4f20-a888-7757a8819975",
+            groupCode
+        ),
+        { conflict: true, reason: "NO_ACTIVE_PRESIDENT" }
     );
 });

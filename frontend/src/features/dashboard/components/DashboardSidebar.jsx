@@ -34,6 +34,11 @@
       </nav>
 
       <div className="sidebar-bottom">
+        {import.meta.env.DEV && (
+          <a className="member-demo-link" href="?memberWorkspace=groups">
+            Explore demo workspace <span aria-hidden="true">↗</span>
+          </a>
+        )}
         <div className="sidebar-security">
           <span className="status-indicator" aria-hidden="true" />
           Account identity verified

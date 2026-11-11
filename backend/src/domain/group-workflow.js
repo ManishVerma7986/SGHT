@@ -1,7 +1,8 @@
 const GROUP_REQUEST_STATUSES = Object.freeze([
     "PENDING",
     "APPROVED",
-    "REJECTED"
+    "REJECTED",
+    "WITHDRAWN"
 ]);
 
 const GROUP_STATUSES = Object.freeze([
@@ -31,6 +32,19 @@ function validateGroupRequest(input) {
     if (!input || typeof input !== "object" || Array.isArray(input)) {
         return { error: "Group request details are required." };
     }
+    const allowedFields = new Set([
+        "groupName",
+        "description",
+        "village",
+        "district",
+        "state",
+        "pinCode",
+        "contactDetails",
+        "proposedGroupSize"
+    ]);
+    if (Object.keys(input).some((field) => !allowedFields.has(field))) {
+        return { error: "Group request contains an unsupported field." };
+    }
 
     const groupName = normalizeText(input.groupName, 150);
     const description = normalizeText(input.description ?? "", 500);
@@ -38,9 +52,10 @@ function validateGroupRequest(input) {
     const district = normalizeText(input.district ?? "", 100);
     const state = normalizeText(input.state ?? "", 100);
     const contactDetails = normalizeText(input.contactDetails ?? "", 254);
+    const pinCode = normalizeText(input.pinCode ?? "", 10);
     const groupSize = input.proposedGroupSize;
 
-    if (!groupName) {
+    if (!groupName || groupName.length < 2) {
         return { error: "Enter a valid group name." };
     }
     if (
@@ -62,6 +77,9 @@ function validateGroupRequest(input) {
     if (input.contactDetails && !contactDetails) {
         return { error: "Enter valid contact details." };
     }
+    if (input.pinCode && !pinCode) {
+        return { error: "Enter a valid PIN code." };
+    }
     if (
         groupSize !== undefined &&
         groupSize !== null &&
@@ -77,6 +95,7 @@ function validateGroupRequest(input) {
             village,
             district,
             state,
+            pinCode,
             contactDetails,
             proposedGroupSize: groupSize ?? null
         })

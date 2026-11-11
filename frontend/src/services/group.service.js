@@ -23,6 +23,107 @@ function createGroupService({ apiRequest }) {
     })
   }
 
+  function getOwnMembershipRequests(token, { signal } = {}) {
+    if (typeof token !== "string" || !token.trim()) {
+      throw new TypeError("An authenticated access token is required.")
+    }
+
+    return apiRequest("/api/v1/group-workflow/membership-requests/mine", {
+      method: "GET",
+      token,
+      signal,
+    })
+  }
+
+  function submitMembershipRequest(
+    token,
+    groupCode,
+    { idempotencyKey, signal } = {},
+  ) {
+    if (typeof token !== "string" || !token.trim()) {
+      throw new TypeError("An authenticated access token is required.")
+    }
+    if (
+      typeof groupCode !== "string" ||
+      !/^[A-Za-z0-9][A-Za-z0-9-]{0,49}$/.test(groupCode)
+    ) {
+      throw new TypeError("A valid group code is required.")
+    }
+    if (
+      typeof idempotencyKey !== "string" ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+        .test(idempotencyKey)
+    ) {
+      throw new TypeError("A valid membership request idempotency key is required.")
+    }
+
+    return apiRequest("/api/v1/group-workflow/membership-requests", {
+      method: "POST",
+      token,
+      signal,
+      headers: { "Idempotency-Key": idempotencyKey },
+      body: JSON.stringify({ groupCode }),
+    })
+  }
+
+  function getPendingMembershipRequests(token, groupCode, { signal } = {}) {
+    if (typeof token !== "string" || !token.trim()) {
+      throw new TypeError("An authenticated access token is required.")
+    }
+    if (
+      typeof groupCode !== "string" ||
+      !/^[A-Za-z0-9][A-Za-z0-9-]{0,49}$/.test(groupCode)
+    ) {
+      throw new TypeError("A valid group code is required.")
+    }
+
+    return apiRequest(
+      `/api/v1/group-workflow/groups/${encodeURIComponent(groupCode)}/membership-requests`,
+      { method: "GET", token, signal },
+    )
+  }
+
+  function decideMembershipRequest(
+    token,
+    requestId,
+    decision,
+    { reason, signal } = {},
+  ) {
+    if (typeof token !== "string" || !token.trim()) {
+      throw new TypeError("An authenticated access token is required.")
+    }
+    if (typeof requestId !== "string" || !/^[0-9a-f]{32}$/i.test(requestId)) {
+      throw new TypeError("A valid membership request reference is required.")
+    }
+    if (!["APPROVED", "REJECTED"].includes(decision)) {
+      throw new TypeError("A valid membership decision is required.")
+    }
+
+    return apiRequest(
+      `/api/v1/group-workflow/membership-requests/${requestId}/decision`,
+      {
+        method: "POST",
+        token,
+        signal,
+        body: JSON.stringify({ decision, reason }),
+      },
+    )
+  }
+
+  function withdrawMembershipRequest(token, requestId, { signal } = {}) {
+    if (typeof token !== "string" || !token.trim()) {
+      throw new TypeError("An authenticated access token is required.")
+    }
+    if (typeof requestId !== "string" || !/^[0-9a-f]{32}$/i.test(requestId)) {
+      throw new TypeError("A valid membership request reference is required.")
+    }
+
+    return apiRequest(
+      `/api/v1/group-workflow/membership-requests/${requestId}/withdraw`,
+      { method: "POST", token, signal },
+    )
+  }
+
   function submitGroupRequest(token, payload, { idempotencyKey, signal } = {}) {
     if (typeof token !== "string" || !token.trim()) {
       throw new TypeError("An authenticated access token is required.")
@@ -100,6 +201,11 @@ function createGroupService({ apiRequest }) {
     getCurrentGroups,
     submitGroupRequest,
     getOwnGroupRequests,
+    getOwnMembershipRequests,
+    submitMembershipRequest,
+    getPendingMembershipRequests,
+    decideMembershipRequest,
+    withdrawMembershipRequest,
     getSelectedGroupData,
     getGroupMembers,
   }

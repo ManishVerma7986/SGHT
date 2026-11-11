@@ -5,6 +5,7 @@ import { createGroupService } from "../../../services/group.service"
 import GroupCreationForm from "./GroupCreationForm"
 import GroupMembershipList from "./GroupMembershipList"
 import GroupRequestList from "./GroupRequestList"
+import MembershipWorkflowPanel from "./MembershipWorkflowPanel"
 
 const groupService = createGroupService({ apiRequest })
 const DIRECTORY_PAGE_SIZE = 25
@@ -91,6 +92,7 @@ function GroupWorkspace({ getAccessToken, onLogout }) {
           getAccessToken={getAccessToken}
           refreshKey={requestRefresh}
         />
+        <MembershipWorkflowPanel getAccessToken={getAccessToken} />
       </>
     )
   }

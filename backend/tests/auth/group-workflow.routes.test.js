@@ -16,7 +16,7 @@ const {
     createGroupWorkflowService
 } = require("../../src/services/group-workflow.service");
 
-function createTestRepository() {
+function createTestRepository(repositoryOptions = {}) {
     const previous = {
         NODE_ENV: process.env.NODE_ENV,
         SHGT_ENABLE_TEST_REPOSITORIES:
@@ -25,7 +25,7 @@ function createTestRepository() {
     process.env.NODE_ENV = "test";
     process.env.SHGT_ENABLE_TEST_REPOSITORIES = "1";
     try {
-        return createInMemoryGroupWorkflowRepository();
+        return createInMemoryGroupWorkflowRepository(repositoryOptions);
     } finally {
         for (const [key, value] of Object.entries(previous)) {
             if (value === undefined) {
@@ -40,14 +40,17 @@ function createTestRepository() {
 async function createHarness({
     adminUserId = 99,
     useTestRepository = true,
-    authorizePlatformAdmin
+    authorizePlatformAdmin,
+    authenticatedUserId = 41,
+    repositoryOptions = {}
 } = {}) {
     const repository = useTestRepository
-        ? createTestRepository()
+        ? createTestRepository(repositoryOptions)
         : undefined;
     const service = createGroupWorkflowService(
         repository ? { repository } : {}
     );
+    let currentUserId = authenticatedUserId;
     const app = express();
     app.use(express.json());
     app.use("/api/v1/group-workflow", createGroupWorkflowRouter({
@@ -57,7 +60,7 @@ async function createHarness({
             return next();
         },
         authorizeUser: (req, res, next) => {
-            req.shgtUser = { userId: 41 };
+            req.shgtUser = { userId: currentUserId };
             return next();
         },
         authorizePlatformAdmin: authorizePlatformAdmin ||
@@ -75,6 +78,9 @@ async function createHarness({
     });
 
     return {
+        setAuthenticatedUserId(userId) {
+            currentUserId = userId;
+        },
         async request(path, { method = "GET", headers = {}, body } = {}) {
             const address = server.address();
             const response = await fetch(
@@ -118,9 +124,32 @@ test("authenticated group request is submitted with verified identity and idempo
         });
 
         assert.equal(response.status, 201);
-        assert.equal(response.body.request.requesterUserId, 41);
+        assert.equal(response.body.request.requesterUserId, undefined);
         assert.equal(response.body.request.status, "PENDING");
         assert.equal(response.body.request.payload.groupName, validPayload.groupName);
+
+        const history = await harness.request(
+            "/api/v1/group-workflow/requests/mine"
+        );
+        assert.equal(history.status, 200);
+        assert.equal(history.body.requests[0].requesterUserId, undefined);
+
+        harness.setAuthenticatedUserId(99);
+        const decision = await harness.request(
+            `/api/v1/group-workflow/admin/requests/${response.body.request.requestId}/decision`,
+            { method: "POST", body: { decision: "APPROVED" } }
+        );
+        assert.equal(decision.status, 200);
+        assert.equal(decision.body.request.decision.adminUserId, undefined);
+        assert.equal(
+            decision.body.request.decision.creatorMembership.userId,
+            undefined
+        );
+        const activation = await harness.request(
+            `/api/v1/group-workflow/admin/groups/${decision.body.request.decision.groupCode}/activate`,
+            { method: "POST" }
+        );
+        assert.equal(activation.status, 409);
     } finally {
         await harness.close();
     }
@@ -212,5 +241,125 @@ test("production routes report unavailable rather than falling back to memory", 
         assert.equal(response.body.request, undefined);
     } finally {
         await harness.close();
+    }
+});
+
+test("membership request routes submit, review, approve, and expose public identifiers only", async () => {
+    const groupCode = "ACTIVE-GROUP-01";
+    const harness = await createHarness({
+        repositoryOptions: {
+            initialGroups: [{ groupCode, groupStatus: "ACTIVE" }],
+            initialMemberships: [{
+                groupCode,
+                userId: 99,
+                memberRole: "PRESIDENT",
+                membershipStatus: "ACTIVE"
+            }]
+        }
+    });
+    try {
+        const submission = await harness.request(
+            "/api/v1/group-workflow/membership-requests",
+            {
+                method: "POST",
+                headers: { "Idempotency-Key": idempotencyKey },
+                body: { groupCode }
+            }
+        );
+        assert.equal(submission.status, 201);
+        assert.equal(submission.body.request.groupCode, groupCode);
+        assert.equal(submission.body.request.status, "PENDING");
+        assert.equal(submission.body.request.requesterUserId, undefined);
+
+        const ownRequests = await harness.request(
+            "/api/v1/group-workflow/membership-requests/mine"
+        );
+        assert.equal(ownRequests.status, 200);
+        assert.equal(ownRequests.body.requests.length, 1);
+
+        harness.setAuthenticatedUserId(99);
+        const pending = await harness.request(
+            `/api/v1/group-workflow/groups/${groupCode}/membership-requests`
+        );
+        assert.equal(pending.status, 200);
+        assert.equal(pending.body.requests[0].requestId,
+            submission.body.request.requestId);
+
+        const decision = await harness.request(
+            `/api/v1/group-workflow/membership-requests/${submission.body.request.requestId}/decision`,
+            { method: "POST", body: { decision: "APPROVED" } }
+        );
+        assert.equal(decision.status, 200);
+        assert.equal(decision.body.request.status, "APPROVED");
+        assert.match(
+            decision.body.request.decision.membershipRef,
+            /^[0-9a-f]{32}$/
+        );
+        assert.equal(decision.body.request.requesterUserId, undefined);
+        assert.equal(decision.body.request.decision.actorUserId, undefined);
+    } finally {
+        await harness.close();
+    }
+});
+
+test("membership workflow authorization and production persistence fail closed", async () => {
+    const groupCode = "ACTIVE-GROUP-02";
+    const repositoryOptions = {
+        initialGroups: [{ groupCode, groupStatus: "ACTIVE" }],
+        initialMemberships: [{
+            groupCode,
+            userId: 99,
+            memberRole: "PRESIDENT",
+            membershipStatus: "ACTIVE"
+        }]
+    };
+    const harness = await createHarness({ repositoryOptions });
+    try {
+        const forbidden = await harness.request(
+            `/api/v1/group-workflow/groups/${groupCode}/membership-requests`
+        );
+        assert.equal(forbidden.status, 403);
+    } finally {
+        await harness.close();
+    }
+
+    const productionHarness = await createHarness({ useTestRepository: false });
+    try {
+        const unavailableSubmission = await productionHarness.request(
+            "/api/v1/group-workflow/membership-requests",
+            {
+                method: "POST",
+                headers: { "Idempotency-Key": idempotencyKey },
+                body: { groupCode }
+            }
+        );
+        const unavailableHistory = await productionHarness.request(
+            "/api/v1/group-workflow/membership-requests/mine"
+        );
+        const unavailableReviewList = await productionHarness.request(
+            `/api/v1/group-workflow/groups/${groupCode}/membership-requests`
+        );
+        const requestId = "a".repeat(32);
+        const unavailableDecision = await productionHarness.request(
+            `/api/v1/group-workflow/membership-requests/${requestId}/decision`,
+            { method: "POST", body: { decision: "APPROVED" } }
+        );
+        const unavailableWithdrawal = await productionHarness.request(
+            `/api/v1/group-workflow/membership-requests/${requestId}/withdraw`,
+            { method: "POST" }
+        );
+        for (const response of [
+            unavailableSubmission,
+            unavailableHistory,
+            unavailableReviewList,
+            unavailableDecision,
+            unavailableWithdrawal
+        ]) {
+            assert.equal(response.status, 503);
+            assert.equal(response.body.success, false);
+        }
+        assert.equal(unavailableSubmission.body.request, undefined);
+    } finally {
+        await productionHarness.close();
     }
 });
